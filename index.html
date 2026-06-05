@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>蝙蝠回聲 ECHO OF THE BAT｜v0.4.0</title>
+<title>蝙蝠回聲 ECHO OF THE BAT｜v0.5.0</title>
 <style>
     * {
         box-sizing: border-box;
@@ -199,7 +199,7 @@
 <div id="startScreen">
     <div id="startPanel">
         <h1>ECHO OF THE BAT</h1>
-        <h2>蝙蝠回聲｜v0.4.0 房間與波次系統版</h2>
+        <h2>蝙蝠回聲｜v0.5.0 地圖節點與事件房版</h2>
         <p>在無盡的黑夜中，一隻年幼的蝙蝠從巢穴中甦醒。牠沒有名字，也沒有記憶，只有體內流動的本能，引導牠穿越這片被怪物吞噬的世界。</p>
         <p><strong>獵殺、成長、進化。</strong> 透過戰鬥累積經驗，選擇你的進化道路，成為掌控鮮血的血蝠、操縱回聲的回聲蝠，或穿梭陰影的影蝠。</p>
 
@@ -265,7 +265,7 @@
 
 <script>
 const canvas = document.getElementById("game");
-const GAME_VERSION = "v0.4.0 房間與波次系統版";
+const GAME_VERSION = "v0.5.0 地圖節點與事件房版";
 const BUILD_DATE = "2026-06-05";
 const ctx = canvas.getContext("2d");
 
@@ -405,7 +405,11 @@ const player = {
 
     hitFlash: 0,
     skillCooldown: 0,
-    maxSkillCooldown: 360
+    maxSkillCooldown: 360,
+
+    globalDamageBonus: 0,
+    healMultiplier: 1,
+    dashRechargeRate: 1
 };
 
 const enemies = [];
@@ -418,49 +422,72 @@ let spawnTimer = 0;
 let killCount = 0;
 let runStartTime = 0;
 
-// v0.4.0：房間與波次系統
+// v0.5.0：地圖節點、房間選路與事件房系統
 let gameMode = "menu"; // menu / training / run
-let currentRoomIndex = 0;
+let currentRoomKey = "start";
 let currentWaveIndex = 0;
 let waveActive = false;
 let roomMessageTimer = 0;
 let roomMessageText = "";
+let runCompletedRooms = new Set();
 
-const rooms = [
-    {
-        name: "覺醒巢穴",
-        intro: "第一個房間：熟悉移動、普攻、衝刺與彈反。",
+const roomDefs = {
+    start: {
+        key: "start",
+        name: "初始房間",
+        type: "start",
+        intro: "黑夜的入口。準備好後，前往第一個戰鬥房。"
+    },
+    small: {
+        key: "small",
+        name: "小怪戰鬥房",
+        type: "combat",
+        intro: "小怪戰鬥房：三波敵人，測試你的基礎操作與進化節奏。",
         waves: [
             ["melee", "melee", "melee"],
             ["melee", "melee", "ranged"],
-            ["melee", "melee", "melee", "ranged"]
+            ["melee", "ranged", "ranged", "heavy"]
         ]
     },
-    {
-        name: "回聲走廊",
-        intro: "第二個房間：遠程敵人開始增加，善用聲波與走位。",
-        waves: [
-            ["ranged", "ranged", "melee"],
-            ["melee", "ranged", "ranged", "heavy"],
-            ["melee", "melee", "ranged", "ranged", "heavy"]
-        ]
-    },
-    {
-        name: "血月前廳",
-        intro: "第三個房間：重甲怪加入戰場，測試你的進化路線是否成形。",
+    elite: {
+        key: "elite",
+        name: "菁英怪戰鬥房",
+        type: "elite",
+        intro: "菁英房：敵人更硬、組合更危險，但獎勵也更好。",
         waves: [
             ["heavy", "melee", "melee"],
             ["heavy", "ranged", "ranged"],
-            ["heavy", "heavy", "melee", "ranged"]
-        ]
+            ["heavy", "heavy", "ranged", "melee"]
+        ],
+        reward: "elite"
     },
-    {
-        name: "第一獵場",
-        intro: "Boss 房：擊倒第一個大型獵物。",
+    event: {
+        key: "event",
+        name: "事件房",
+        type: "event",
+        intro: "事件房：不一定需要戰鬥，但每個選擇都有代價。"
+    },
+    boss: {
+        key: "boss",
+        name: "BOSS房",
+        type: "boss",
+        intro: "Boss房：第一個大型獵物正在等待你的回聲。",
         bossRoom: true,
         waves: []
     }
-];
+};
+
+const mapRoutes = {
+    start: ["small"],
+    small: ["elite", "event"],
+    elite: ["boss"],
+    event: ["boss"],
+    boss: []
+};
+
+function getCurrentRoom() {
+    return roomDefs[currentRoomKey];
+}
 
 function getArenaRect() {
     const marginX = Math.max(80, canvas.width * 0.08);
@@ -691,6 +718,8 @@ function drawLowHpWarning() {
 }
 
 function damageEnemy(e, amount) {
+    if (player.globalDamageBonus) amount *= 1 + player.globalDamageBonus;
+
     if (player.form === "Blood Bat") {
         const missing = 1 - player.hp / player.maxHp;
         amount *= 1 + missing * 1.2;
@@ -723,6 +752,8 @@ function damageEnemy(e, amount) {
 }
 
 function healPlayer(amount) {
+    if (player.healMultiplier) amount *= player.healMultiplier;
+
     if (player.form === "Shadow Bat") amount *= 0.35;
     if (player.form === "Echo Bat") amount *= 0.7;
     if (player.form === "Blood Bat") amount *= 1.5;
@@ -974,18 +1005,16 @@ function setTrainerVisible(visible) {
 function startRunMode() {
     resetGameState();
     gameMode = "run";
-    currentRoomIndex = 0;
+    currentRoomKey = "start";
     currentWaveIndex = 0;
     waveActive = false;
+    runCompletedRooms = new Set();
     startScreen.style.display = "none";
     overlay.style.display = "none";
     setTrainerVisible(false);
-    gamePaused = false;
+    gamePaused = true;
     movePlayerToRoomCenter();
-    showRoomMessage(rooms[currentRoomIndex].name, 120);
-    setTimeout(() => {
-        if (gameMode === "run" && !gamePaused && !gameOver) startCurrentRoom();
-    }, 700);
+    showMapSelection("初始房間");
 }
 
 function startTrainingMode() {
@@ -1004,20 +1033,88 @@ function movePlayerToRoomCenter() {
     player.y = a.y + a.h / 2;
 }
 
+function showMapSelection(title = "選擇下一個房間") {
+    if (gameMode !== "run") return;
+
+    gamePaused = true;
+    overlay.style.display = "flex";
+    overlayTitle.textContent = title;
+
+    const nextRooms = mapRoutes[currentRoomKey] || [];
+    let mapText = `
+        <strong>目前位置：</strong>${getCurrentRoom()?.name || "未知"}<br><br>
+        <div style="line-height:1.8">
+            　　　　　[BOSS房]<br>
+            　　　　　　 ↑<br>
+            [菁英房] ← [小怪戰鬥房] → [事件房]<br>
+            　　　　　　 ↑<br>
+            　　　　　[初始房間]
+        </div><br>
+        選擇下一個房間。不同路線會改變你的風險與獎勵。
+    `;
+
+    if (currentRoomKey === "start") {
+        mapText += "<br><br>先進入小怪戰鬥房，累積經驗並完成第一次進化。";
+    }
+    if (currentRoomKey === "small") {
+        mapText += "<br><br>你可以選擇挑戰菁英房，或進入事件房賭一個特殊強化。";
+    }
+    if (currentRoomKey === "elite" || currentRoomKey === "event") {
+        mapText += "<br><br>下一步將進入 Boss 房。";
+    }
+
+    overlayText.innerHTML = mapText;
+    buttons.innerHTML = "";
+
+    for (const key of nextRooms) {
+        const room = roomDefs[key];
+        const desc =
+            room.type === "combat" ? "三波小怪。穩定獲得經驗，適合建立進化節奏。" :
+            room.type === "elite" ? "三波高壓敵人。難度較高，但會提供額外獎勵。" :
+            room.type === "event" ? "獲得特殊強化，但必須付出代價。" :
+            room.type === "boss" ? "進入第一個 Boss 戰。擊敗牠，完成這輪狩獵。" :
+            "進入下一個房間。";
+
+        addButton(room.name, desc, () => enterMapRoom(key));
+    }
+
+    addButton("返回主選單", "回到開始畫面。", returnToMainMenu);
+}
+
+function enterMapRoom(key) {
+    currentRoomKey = key;
+    overlay.style.display = "none";
+    gamePaused = false;
+    movePlayerToRoomCenter();
+
+    const room = getCurrentRoom();
+
+    if (room.type === "event") {
+        showEventRoom();
+        return;
+    }
+
+    startCurrentRoom();
+}
+
 function startCurrentRoom() {
-    const room = rooms[currentRoomIndex];
+    const room = getCurrentRoom();
     clearEnemies();
     movePlayerToRoomCenter();
     showRoomMessage(room.intro || room.name, 150);
 
     if (room.bossRoom) {
         const a = getArenaRect();
-        spawnBoss(false);
-        if (boss) {
-            boss.x = a.x + a.w / 2;
-            boss.y = a.y + 110;
-        }
+        // Boss 房先放一波護衛，清完護衛後 Boss 登場
+        currentWaveIndex = 0;
         waveActive = true;
+        const guardWave = ["melee", "ranged", "heavy"];
+        const points = getSpawnPoints();
+        for (let i = 0; i < guardWave.length; i++) {
+            const p = points[i % points.length];
+            spawnEnemy(guardWave[i], false, p.x + rand(-28, 28), p.y + rand(-28, 28));
+        }
+        showRoomMessage("Boss護衛出現", 110);
         return;
     }
 
@@ -1026,8 +1123,8 @@ function startCurrentRoom() {
 }
 
 function startNextWave() {
-    const room = rooms[currentRoomIndex];
-    if (!room || room.bossRoom) return;
+    const room = getCurrentRoom();
+    if (!room || room.bossRoom || !room.waves) return;
 
     if (currentWaveIndex >= room.waves.length) {
         completeRoom();
@@ -1048,17 +1145,69 @@ function startNextWave() {
 
 function completeRoom() {
     waveActive = false;
-    currentRoomIndex++;
+    const room = getCurrentRoom();
+    runCompletedRooms.add(currentRoomKey);
 
-    if (currentRoomIndex >= rooms.length) {
+    if (room.reward === "elite") {
+        player.xp += 45;
+        healPlayer(18);
+        addEffect(player.x, player.y, 95, "rgba(255,220,120,0.35)", 55, "菁英獎勵");
+        checkEvolution();
+    }
+
+    if (currentRoomKey === "boss") {
         bossVictory();
         return;
     }
 
     showRoomMessage("房間清理完成", 90);
     setTimeout(() => {
-        if (gameMode === "run" && !gamePaused && !gameOver) startCurrentRoom();
+        if (gameMode === "run" && !gamePaused && !gameOver) showMapSelection("房間清理完成");
     }, 900);
+}
+
+function showEventRoom() {
+    gamePaused = true;
+    overlay.style.display = "flex";
+    overlayTitle.textContent = "事件房｜黑夜祭壇";
+    overlayText.innerHTML = `
+        這裡沒有敵人，只有三個不穩定的回聲。<br>
+        每個選擇都會讓你變強，但也會留下代價。
+    `;
+    buttons.innerHTML = "";
+
+    addButton("血池", "失去 20 生命，獲得永久 +15% 傷害。", () => {
+        player.hp = Math.max(1, player.hp - 20);
+        player.globalDamageBonus += 0.15;
+        addEffect(player.x, player.y, 100, "rgba(255,0,80,0.4)", 55, "血池強化");
+        completeEventRoom("血池的力量流入體內。永久傷害 +15%。");
+    });
+
+    addButton("回聲祭壇", "生命上限 -10，聲波最大充能 +1。", () => {
+        player.maxHp = Math.max(50, player.maxHp - 10);
+        player.hp = Math.min(player.hp, player.maxHp);
+        player.maxEchoCharges += 1;
+        player.echoCharges = Math.min(player.maxEchoCharges, player.echoCharges + 1);
+        addEffect(player.x, player.y, 100, "rgba(80,220,255,0.4)", 55, "回聲強化");
+        completeEventRoom("你的回聲變得更深。聲波最大充能 +1。");
+    });
+
+    addButton("影之裂縫", "衝刺充能速度 +25%，但吸血效果 -10%。", () => {
+        player.dashRechargeRate += 0.25;
+        player.healMultiplier *= 0.9;
+        addEffect(player.x, player.y, 100, "rgba(130,90,255,0.42)", 55, "影裂強化");
+        completeEventRoom("陰影縮短了你的間隔。衝刺充能速度 +25%。");
+    });
+}
+
+function completeEventRoom(message) {
+    runCompletedRooms.add("event");
+    overlay.style.display = "none";
+    gamePaused = false;
+    showRoomMessage(message, 140);
+    setTimeout(() => {
+        if (gameMode === "run" && !gamePaused && !gameOver) showMapSelection("事件完成");
+    }, 950);
 }
 
 function updateRoomSystem() {
@@ -1066,7 +1215,7 @@ function updateRoomSystem() {
 
     if (roomMessageTimer > 0) roomMessageTimer--;
 
-    const room = rooms[currentRoomIndex];
+    const room = getCurrentRoom();
     if (!room) return;
 
     if (!room.bossRoom && waveActive && enemies.length === 0) {
@@ -1075,6 +1224,17 @@ function updateRoomSystem() {
         setTimeout(() => {
             if (gameMode === "run" && !gamePaused && !gameOver) startNextWave();
         }, 650);
+    }
+
+    if (room.bossRoom && !boss && enemies.length === 0 && waveActive) {
+        const a = getArenaRect();
+        spawnBoss(false);
+        if (boss) {
+            boss.x = a.x + a.w / 2;
+            boss.y = a.y + 110;
+        }
+        showRoomMessage("Boss登場", 110);
+        waveActive = false;
     }
 }
 
@@ -1173,13 +1333,17 @@ function resetGameState() {
     player.invisible = 0;
     player.hitFlash = 0;
     player.skillCooldown = 0;
+    player.globalDamageBonus = 0;
+    player.healMultiplier = 1;
+    player.dashRechargeRate = 1;
 
     invincible = false;
     enemyMoveEnabled = true;
     autoSpawnEnabled = false;
-    currentRoomIndex = 0;
+    currentRoomKey = "start";
     currentWaveIndex = 0;
     waveActive = false;
+    runCompletedRooms = new Set();
     roomMessageTimer = 0;
     roomMessageText = "";
     updateTrainerButtonLabels();
@@ -1484,7 +1648,7 @@ function updatePlayer() {
         player.echoCharges = clamp(player.echoCharges + 1, 0, player.maxEchoCharges);
     }
 
-    player.dashRecharge += 0.012;
+    player.dashRecharge += 0.012 * (player.dashRechargeRate || 1);
     if (player.dashRecharge >= 1) {
         player.dashRecharge = 0;
         player.dashCharges = clamp(player.dashCharges + 1, 0, player.maxDashCharges);
@@ -1782,24 +1946,33 @@ function drawUI() {
     ctx.fillText(`聲波：${Math.floor(player.echoCharges)} / ${player.maxEchoCharges}　衝刺：${Math.floor(player.dashCharges)} / ${player.maxDashCharges}`, 20, 113);
     ctx.fillText(`擊殺：${killCount}　時間：${getSurvivalSeconds()}秒`, 20, 138);
 
+    if (player.globalDamageBonus > 0 || player.dashRechargeRate > 1 || player.healMultiplier < 1) {
+        ctx.fillStyle = "rgba(255,255,255,0.78)";
+        ctx.fillText(`強化：傷害+${Math.round(player.globalDamageBonus * 100)}%｜衝刺充能x${player.dashRechargeRate.toFixed(2)}｜吸血x${player.healMultiplier.toFixed(2)}`, 20, 163);
+        ctx.fillStyle = "white";
+    }
+
     if (gameMode === "run") {
-        const room = rooms[currentRoomIndex];
+        const room = getCurrentRoom();
         if (room) {
             ctx.fillStyle = "#b8d7ff";
-            const waveText = room.bossRoom ? "Boss 房" : `第 ${Math.min(currentWaveIndex + 1, room.waves.length)} / ${room.waves.length} 波`;
-            ctx.fillText(`房間：${room.name}｜${waveText}`, 20, 163);
+            let waveText = "地圖選擇";
+            if (room.bossRoom) waveText = boss ? "Boss戰" : "Boss護衛";
+            else if (room.waves) waveText = `第 ${Math.min(currentWaveIndex + 1, room.waves.length)} / ${room.waves.length} 波`;
+            else if (room.type === "event") waveText = "事件";
+            ctx.fillText(`房間：${room.name}｜${waveText}`, 20, (player.globalDamageBonus > 0 || player.dashRechargeRate > 1 || player.healMultiplier < 1) ? 188 : 163);
             ctx.fillStyle = "white";
         }
     }
 
     if (player.form === "Blood Bat") {
         ctx.fillStyle = "#ff5b83";
-        ctx.fillText(`血怒增傷：+${getBloodBonusPercent()}%`, 20, gameMode === "run" ? 188 : 163);
+        ctx.fillText(`血怒增傷：+${getBloodBonusPercent()}%`, 20, gameMode === "run" ? ((player.globalDamageBonus > 0 || player.dashRechargeRate > 1 || player.healMultiplier < 1) ? 213 : 188) : 163);
     }
-    if (player.bloodRage > 0) ctx.fillText("血怒狀態中", 20, gameMode === "run" ? 213 : 188);
-    if (player.shadowHunt > 0) ctx.fillText("影獵狀態中", 20, gameMode === "run" ? 213 : 188);
+    if (player.bloodRage > 0) ctx.fillText("血怒狀態中", 20, gameMode === "run" ? ((player.globalDamageBonus > 0 || player.dashRechargeRate > 1 || player.healMultiplier < 1) ? 238 : 213) : 188);
+    if (player.shadowHunt > 0) ctx.fillText("影獵狀態中", 20, gameMode === "run" ? ((player.globalDamageBonus > 0 || player.dashRechargeRate > 1 || player.healMultiplier < 1) ? 238 : 213) : 188);
 
-    drawSkillIcon(26, gameMode === "run" ? 229 : 204);
+    drawSkillIcon(26, gameMode === "run" ? ((player.globalDamageBonus > 0 || player.dashRechargeRate > 1 || player.healMultiplier < 1) ? 254 : 229) : 204);
 
     if (boss) {
         drawBar(canvas.width / 2 - 220, 25, 440, 18, boss.hp / boss.maxHp, "#9b2cff", `Boss 第 ${boss.phase} 階段`);
@@ -2086,7 +2259,7 @@ function draw() {
 function bossVictory() {
     gamePaused = true;
     overlay.style.display = "flex";
-    overlayTitle.textContent = gameMode === "run" ? "第一輪狩獵完成" : "第一個獵物已倒下";
+    overlayTitle.textContent = gameMode === "run" ? "第一章狩獵完成" : "第一個獵物已倒下";
     overlayText.innerHTML = `你的回聲撕開了黑夜。<br>目前型態：${formName()}｜擊殺數：${killCount}｜存活時間：${getSurvivalSeconds()} 秒`;
     buttons.innerHTML = "";
     if (gameMode !== "run") addButton("繼續挑戰", "保留目前狀態，繼續測試戰鬥。", resumeGame);
