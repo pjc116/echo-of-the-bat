@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>蝙蝠回聲 ECHO OF THE BAT｜v0.5.1</title>
+<title>蝙蝠回聲 ECHO OF THE BAT｜v0.5.3</title>
 <style>
     * {
         box-sizing: border-box;
@@ -199,7 +199,7 @@
 <div id="startScreen">
     <div id="startPanel">
         <h1>ECHO OF THE BAT</h1>
-        <h2>蝙蝠回聲｜v0.5.1 穩定性修正版</h2>
+        <h2>蝙蝠回聲｜v0.5.2 Boss流程與穩定性修正版</h2>
         <p>在無盡的黑夜中，一隻年幼的蝙蝠從巢穴中甦醒。牠沒有名字，也沒有記憶，只有體內流動的本能，引導牠穿越這片被怪物吞噬的世界。</p>
         <p><strong>獵殺、成長、進化。</strong> 透過戰鬥累積經驗，選擇你的進化道路，成為掌控鮮血的血蝠、操縱回聲的回聲蝠，或穿梭陰影的影蝠。</p>
 
@@ -265,7 +265,7 @@
 
 <script>
 const canvas = document.getElementById("game");
-const GAME_VERSION = "v0.5.1 穩定性修正版";
+const GAME_VERSION = "v0.5.3 Boss與卡死防護版";
 const BUILD_DATE = "2026-06-05";
 const ctx = canvas.getContext("2d");
 
@@ -285,20 +285,14 @@ window.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         e.preventDefault();
 
-        // v0.5.1：ESC 穩定化
-        // 遊戲中：開啟暫停選單
-        // 暫停/操作說明中：返回遊戲
         if (startScreen.style.display !== "none") return;
 
         if (overlay.style.display === "flex") {
-            const title = overlayTitle.textContent;
-            if (title === "暫停" || title === "操作說明") {
-                resumeGame();
-            }
-            return;
+            overlay.style.display = "none";
+            if (!gameOver) gamePaused = false;
+        } else if (!gameOver) {
+            showPauseMenu();
         }
-
-        if (!gameOver) showPauseMenu();
         return;
     }
 
@@ -349,6 +343,20 @@ const overlay = document.getElementById("overlay");
 const overlayTitle = document.getElementById("overlayTitle");
 const overlayText = document.getElementById("overlayText");
 const buttons = document.getElementById("buttons");
+
+let runtimeErrorShown = false;
+function handleRuntimeError(err) {
+    console.error("ECHO OF THE BAT runtime error:", err);
+    if (runtimeErrorShown) return;
+    runtimeErrorShown = true;
+    gamePaused = true;
+    overlay.style.display = "flex";
+    overlayTitle.textContent = "遊戲流程發生錯誤";
+    overlayText.innerHTML = "偵測到流程卡住或程式錯誤，已自動暫停避免畫面死住。<br>你可以重新開始目前模式，或返回主選單。";
+    buttons.innerHTML = "";
+    addButton("重新開始", "重置目前模式。", restartCurrentMode);
+    addButton("返回主選單", "回到開始畫面。", returnToMainMenu);
+}
 
 let gamePaused = true;
 let gameOver = false;
@@ -442,7 +450,8 @@ let waveActive = false;
 let roomMessageTimer = 0;
 let roomMessageText = "";
 let runCompletedRooms = new Set();
-let bossDefeated = false; // v0.5.1：避免 Boss 死亡後流程重複觸發或卡住
+let bossRoomState = "none"; // none / guards / boss / clear
+let victoryShown = false;
 
 const roomDefs = {
     start: {
@@ -748,17 +757,16 @@ function damageEnemy(e, amount) {
 
     if (e.hp <= 0) {
         if (e === boss) {
+            if (victoryShown) return;
+            e.hp = 0;
             boss = null;
-            bossDefeated = true;
+            bossRoomState = "clear";
             waveActive = false;
             killCount++;
             player.xp += 150;
-
-            // v0.5.1：Boss 死亡後清掉殘留攻擊，避免勝利畫面被子彈/天降攻擊干擾
-            enemies.length = 0;
             projectiles.length = 0;
             fallingAttacks.length = 0;
-
+            player.dashTime = 0;
             addEffect(canvas.width / 2, canvas.height / 2, 160, "rgba(255,220,120,0.35)", 80, "BOSS 擊敗");
             bossVictory();
             return;
@@ -1031,6 +1039,8 @@ function startRunMode() {
     currentWaveIndex = 0;
     waveActive = false;
     runCompletedRooms = new Set();
+    bossRoomState = "none";
+    victoryShown = false;
     startScreen.style.display = "none";
     overlay.style.display = "none";
     setTrainerVisible(false);
@@ -1127,9 +1137,9 @@ function startCurrentRoom() {
 
     if (room.bossRoom) {
         const a = getArenaRect();
-        bossDefeated = false;
         // Boss 房先放一波護衛，清完護衛後 Boss 登場
         currentWaveIndex = 0;
+        bossRoomState = "guards";
         waveActive = true;
         const guardWave = ["melee", "ranged", "heavy"];
         const points = getSpawnPoints();
@@ -1241,38 +1251,46 @@ function updateRoomSystem() {
     const room = getCurrentRoom();
     if (!room) return;
 
-    if (!room.bossRoom && waveActive && enemies.length === 0) {
-        waveActive = false;
-        currentWaveIndex++;
-        setTimeout(() => {
-            if (gameMode === "run" && !gamePaused && !gameOver) startNextWave();
-        }, 650);
-        return;
-    }
-
-    // v0.5.1：Boss 房流程穩定化
-    // 流程固定為：護衛波清空 → Boss 登場 → Boss 死亡時由 damageEnemy() 統一觸發勝利。
     if (room.bossRoom) {
-        if (bossDefeated) return;
-
-        if (!boss && enemies.length === 0 && waveActive) {
+        // Boss 房使用明確狀態，避免靠 boss / waveActive 猜流程導致空場卡住。
+        if (bossRoomState === "guards" && waveActive && enemies.length === 0) {
             const a = getArenaRect();
             spawnBoss(false);
             if (boss) {
                 boss.x = a.x + a.w / 2;
                 boss.y = a.y + 110;
             }
-            showRoomMessage("Boss登場", 110);
+            bossRoomState = "boss";
             waveActive = false;
+            showRoomMessage("BOSS登場", 110);
             return;
         }
 
-        // 保險：如果 Boss 房出現空場且沒有任何流程狀態，直接結算，避免玩家卡死。
-        if (!boss && enemies.length === 0 && !waveActive) {
-            bossDefeated = true;
+        if (bossRoomState === "boss" && !boss) {
+            bossRoomState = "clear";
+            waveActive = false;
             bossVictory();
             return;
         }
+
+        // 保險：如果 Boss 房已經沒有護衛、沒有 Boss、也沒有勝利畫面，
+        // 代表流程狀態遺失，直接進入勝利結算，避免空場卡死。
+        if (!victoryShown && enemies.length === 0 && !boss && bossRoomState !== "guards") {
+            bossRoomState = "clear";
+            waveActive = false;
+            bossVictory();
+            return;
+        }
+
+        return;
+    }
+
+    if (waveActive && enemies.length === 0) {
+        waveActive = false;
+        currentWaveIndex++;
+        setTimeout(() => {
+            if (gameMode === "run" && !gamePaused && !gameOver) startNextWave();
+        }, 650);
     }
 }
 
@@ -1382,7 +1400,8 @@ function resetGameState() {
     currentWaveIndex = 0;
     waveActive = false;
     runCompletedRooms = new Set();
-    bossDefeated = false;
+    bossRoomState = "none";
+    victoryShown = false;
     roomMessageTimer = 0;
     roomMessageText = "";
     updateTrainerButtonLabels();
@@ -1650,13 +1669,22 @@ function updatePlayer() {
                 player.dashHitSet.add(e);
 
                 if (player.form === "Shadow Bat") {
+                    const wasBoss = e === boss;
                     damageEnemy(e, 20);
+
+                    // 如果這次衝刺剛好擊殺 Boss，立刻停止後續印記與位移處理，
+                    // 避免 Boss 已經被設為 null 後又被影印記二次處理，造成流程卡住。
+                    if (wasBoss && boss === null) {
+                        player.dashTime = 0;
+                        break;
+                    }
+
                     applyShadowMark(e);
                     addEffect(e.x, e.y, 35, "rgba(120,80,255,0.35)", 15);
 
-                    // v0.5.1：防止影蝠高速衝刺時卡進重甲怪或 Boss 身體裡
+                    // 防止影蝠高速衝刺卡進重甲怪或 Boss 身體。
                     const pushAngle = angleTo(e, player);
-                    const safeDist = e.r + player.r + 8;
+                    const safeDist = e.r + player.r + 10;
                     player.x = e.x + Math.cos(pushAngle) * safeDist;
                     player.y = e.y + Math.sin(pushAngle) * safeDist;
                     player.dashTime = Math.min(player.dashTime, 2);
@@ -1710,18 +1738,15 @@ function updateEnemies() {
 
         const spd = e.stagger > 0 ? 0 : e.speed * (e.slow > 0 ? 0.45 : 1);
 
-        // v0.5.1：影獵隱形期間，敵人不再即時鎖定玩家。
-        // 牠們會短暫失去目標並緩慢游移，避免看起來仍然追著玩家跑。
+        // 影獵隱形修正：隱形期間敵人失去目標，只會緩慢徘徊，不再追蹤或攻擊玩家。
         if (player.invisible > 0) {
-            if (e.wanderAngle === undefined || Math.random() < 0.012) {
+            if (e.wanderAngle === undefined || Math.random() < 0.015) {
                 e.wanderAngle = Math.random() * Math.PI * 2;
             }
-
             if (enemyMoveEnabled && e.stagger <= 0) {
-                e.x += Math.cos(e.wanderAngle) * spd * 0.35;
-                e.y += Math.sin(e.wanderAngle) * spd * 0.35;
+                e.x += Math.cos(e.wanderAngle) * spd * 0.45;
+                e.y += Math.sin(e.wanderAngle) * spd * 0.45;
             }
-
             continue;
         }
 
@@ -1891,7 +1916,7 @@ function updateBoss() {
 
     const choices = boss.phase === 1
         ? ["swipe", "shot", "ring"]
-        : ["swipe", "shot", "ring", "charge", "fall"];
+        : ["swipe", "shot", "ring", "charge"];
 
     const attack = choices[Math.floor(Math.random() * choices.length)];
 
@@ -2314,7 +2339,16 @@ function draw() {
 }
 
 function bossVictory() {
+    if (victoryShown) return;
+    victoryShown = true;
     gamePaused = true;
+    gameOver = false;
+    waveActive = false;
+    bossRoomState = "clear";
+    projectiles.length = 0;
+    fallingAttacks.length = 0;
+    enemies.length = 0;
+    boss = null;
     overlay.style.display = "flex";
     overlayTitle.textContent = gameMode === "run" ? "第一章狩獵完成" : "第一個獵物已倒下";
     overlayText.innerHTML = `你的回聲撕開了黑夜。<br>目前型態：${formName()}｜擊殺數：${killCount}｜存活時間：${getSurvivalSeconds()} 秒`;
@@ -2336,8 +2370,13 @@ function endGame() {
 }
 
 function loop() {
-    update();
-    draw();
+    try {
+        update();
+        draw();
+    } catch (err) {
+        handleRuntimeError(err);
+        try { draw(); } catch (_) {}
+    }
     requestAnimationFrame(loop);
 }
 
