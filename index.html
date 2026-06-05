@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>蝙蝠回聲 ECHO OF THE BAT｜v0.6.0</title>
+<title>蝙蝠回聲 ECHO OF THE BAT｜v0.6.1</title>
 <style>
     * {
         box-sizing: border-box;
@@ -210,7 +210,7 @@
 <div id="startScreen">
     <div id="startPanel">
         <h1>ECHO OF THE BAT</h1>
-        <h2>蝙蝠回聲｜v0.6.0 無盡模式與新怪物版</h2>
+        <h2>蝙蝠回聲｜v0.6.1 無盡難度曲線調整版</h2>
         <p>在無盡的黑夜中，一隻年幼的蝙蝠從巢穴中甦醒。牠沒有名字，也沒有記憶，只有體內流動的本能，引導牠穿越這片被怪物吞噬的世界。</p>
         <p><strong>獵殺、成長、進化。</strong> 透過戰鬥累積經驗，選擇你的進化道路，成為掌控鮮血的血蝠、操縱回聲的回聲蝠，或穿梭陰影的影蝠。</p>
 
@@ -290,7 +290,7 @@
 
 <script>
 const canvas = document.getElementById("game");
-const GAME_VERSION = "v0.6.0 無盡模式與新怪物版";
+const GAME_VERSION = "v0.6.1 無盡難度曲線調整版";
 const BUILD_DATE = "2026-06-06";
 const ctx = canvas.getContext("2d");
 
@@ -2250,19 +2250,69 @@ function spawnEndlessWave() {
     const points = getSpawnPoints();
     let wave = [];
 
-    const baseCount = 3 + Math.floor(endlessWave * 0.65);
-    for (let i = 0; i < baseCount; i++) wave.push("melee");
-    if (endlessWave >= 2) wave.push("ranged");
-    if (endlessWave >= 3) wave.push("exploder");
-    if (endlessWave >= 4) wave.push("heavy");
-    if (endlessWave >= 5) wave.push("sniper");
-    if (endlessWave >= 6) wave.push("summoner");
-    if (endlessWave % 5 === 0) wave.push("heavy", "sniper");
-
+    // v0.6.1：無盡模式難度曲線調整
+    // 目標：前期不要太快把所有怪混在一起，而是逐步增加數量與壓力。
+    // 每 10 波為 Boss 波，Boss 波不生成任何小怪，讓玩家專心打 Boss。
     if (endlessWave % 10 === 0) {
-        spawnTwinBoss(false);
-    } else if (endlessWave % 7 === 0) {
-        spawnBoss(false);
+        if (endlessWave % 20 === 0) {
+            spawnTwinBoss(false);
+            showRoomMessage(`無盡模式｜第 ${endlessWave} 波｜雙子 Boss`, 130);
+        } else {
+            spawnBoss(false);
+            showRoomMessage(`無盡模式｜第 ${endlessWave} 波｜Boss`, 130);
+        }
+        return;
+    }
+
+    function add(type, count) {
+        for (let i = 0; i < count; i++) wave.push(type);
+    }
+
+    const baseCount = 3 + Math.floor(endlessWave * 0.38);
+
+    // 1~2波：只出近戰，讓玩家熱身。
+    if (endlessWave <= 2) {
+        add("melee", baseCount + 1);
+    }
+    // 3~4波：加入少量遠程，但主壓力仍然是近戰數量。
+    else if (endlessWave <= 4) {
+        add("melee", baseCount + 1);
+        add("ranged", 1);
+    }
+    // 5~7波：加入重甲，讓玩家開始學會優先處理目標。
+    else if (endlessWave <= 7) {
+        add("melee", baseCount);
+        add("ranged", 1);
+        add("heavy", 1);
+    }
+    // 8~11波：爆裂怪開始出現，但數量很少，用來逼走位。
+    else if (endlessWave <= 11) {
+        add("melee", baseCount + 1);
+        add("ranged", 2);
+        add("heavy", 1);
+        add("exploder", 1);
+    }
+    // 12~15波：狙擊怪加入，仍避免召喚怪太早讓場面失控。
+    else if (endlessWave <= 15) {
+        add("melee", baseCount + 1);
+        add("ranged", 2);
+        add("heavy", 2);
+        add("exploder", 1);
+        add("sniper", 1);
+    }
+    // 16波後：召喚怪加入，但一波最多少量，避免怪物豐富度過度混亂。
+    else {
+        add("melee", baseCount + 2);
+        add("ranged", 2 + Math.floor(endlessWave / 12));
+        add("heavy", 2 + Math.floor(endlessWave / 14));
+        add("exploder", 1 + Math.floor(endlessWave / 18));
+        add("sniper", 1 + Math.floor(endlessWave / 20));
+        add("summoner", Math.min(2, 1 + Math.floor((endlessWave - 16) / 12)));
+    }
+
+    // 每 5 波給一點額外壓力，但不再額外塞太多不同怪種。
+    if (endlessWave % 5 === 0) {
+        add("heavy", 1);
     }
 
     for (let i = 0; i < wave.length; i++) {
