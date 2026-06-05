@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>蝙蝠回聲 ECHO OF THE BAT｜v0.6.1</title>
+<title>蝙蝠回聲 ECHO OF THE BAT｜v0.6.2</title>
 <style>
     * {
         box-sizing: border-box;
@@ -210,7 +210,7 @@
 <div id="startScreen">
     <div id="startPanel">
         <h1>ECHO OF THE BAT</h1>
-        <h2>蝙蝠回聲｜v0.6.1 無盡難度曲線調整版</h2>
+        <h2>蝙蝠回聲｜v0.6.2 戰鬥手感更新版</h2>
         <p>在無盡的黑夜中，一隻年幼的蝙蝠從巢穴中甦醒。牠沒有名字，也沒有記憶，只有體內流動的本能，引導牠穿越這片被怪物吞噬的世界。</p>
         <p><strong>獵殺、成長、進化。</strong> 透過戰鬥累積經驗，選擇你的進化道路，成為掌控鮮血的血蝠、操縱回聲的回聲蝠，或穿梭陰影的影蝠。</p>
 
@@ -290,7 +290,7 @@
 
 <script>
 const canvas = document.getElementById("game");
-const GAME_VERSION = "v0.6.1 無盡難度曲線調整版";
+const GAME_VERSION = "v0.6.2 戰鬥手感更新版";
 const BUILD_DATE = "2026-06-06";
 const ctx = canvas.getContext("2d");
 
@@ -993,17 +993,70 @@ function successfulParry(perfect) {
     }
 }
 
+
+function getBasicAttackRange() {
+    if (player.empoweredAttack) return 105;
+    if (player.form === "Blood Bat") return 78;
+    if (player.form === "Echo Bat") return 66;
+    if (player.form === "Shadow Bat") return 68;
+    return 62;
+}
+
+function getBasicAttackArc() {
+    if (player.form === "Blood Bat") return 1.65;
+    if (player.form === "Shadow Bat") return 1.05;
+    return 1.05;
+}
+
+function applyBasicAttackImpact(e, power = 1) {
+    if (!e) return;
+
+    const knock =
+        e === boss ? 1.5 :
+        e.type === "heavy" ? 3 :
+        isTwinType(e.type) ? 2 :
+        e.type === "summoner" ? 5 :
+        7;
+
+    e.x += Math.cos(player.attackAngle) * knock * power;
+    e.y += Math.sin(player.attackAngle) * knock * power;
+
+    // 普攻命中時給一點硬直與震動，讓玩家感覺真的打到東西。
+    e.stagger = Math.max(e.stagger || 0, e.type === "heavy" || e === boss || isTwinType(e.type) ? 4 : 7);
+    hitStop = Math.max(hitStop, e === boss || isTwinType(e.type) ? 3 : 2);
+    screenShake = Math.max(screenShake, e === boss || isTwinType(e.type) ? 5 : 3);
+
+    addEffect(
+        e.x,
+        e.y,
+        e === boss || isTwinType(e.type) ? 34 : 24,
+        formAccentColor(0.32),
+        10,
+        ""
+    );
+}
+
 function basicAttack() {
     if (gamePaused || gameOver) return;
     if (player.attackTime > 0) return;
 
     player.attackAngle = angleTo(player, mouse);
-    player.attackTime = 12;
+    player.attackTime = 14;
 
-    const range = player.empoweredAttack ? 95 : player.form === "Blood Bat" ? 65 : 52;
-    const arc = player.form === "Blood Bat" ? 1.5 : 0.9;
-    const damage = player.empoweredAttack ? 36 : player.form === "Blood Bat" ? 20 : 16;
+    const range = getBasicAttackRange();
+    const arc = getBasicAttackArc();
+    const damage = player.empoweredAttack ? 38 : player.form === "Blood Bat" ? 21 : 17;
 
+    // 揮擊起手特效：讓普攻不再像單純按一下判定。
+    addEffect(
+        player.x + Math.cos(player.attackAngle) * 26,
+        player.y + Math.sin(player.attackAngle) * 26,
+        player.empoweredAttack ? 58 : 42,
+        formAccentColor(player.empoweredAttack ? 0.38 : 0.25),
+        8
+    );
+
+    let hitSomething = false;
     const targets = [...enemies];
     if (boss) targets.push(boss);
 
@@ -1013,7 +1066,9 @@ function basicAttack() {
         let diff = Math.abs(Math.atan2(Math.sin(a - player.attackAngle), Math.cos(a - player.attackAngle)));
 
         if (d < range + e.r && diff < arc / 2) {
+            hitSomething = true;
             damageEnemy(e, damage);
+            applyBasicAttackImpact(e, player.empoweredAttack ? 1.35 : 1);
             healPlayer(player.form === "Blood Bat" ? 2.2 : 1.2);
 
             if (player.form === "Blood Bat") {
@@ -1021,6 +1076,7 @@ function basicAttack() {
                 if (e.bloodMark >= 5) {
                     e.bloodMark = 0;
                     damageEnemy(e, 18);
+                    applyBasicAttackImpact(e, 0.8);
                     healPlayer(10);
                     addEffect(e.x, e.y, 55, "rgba(255,0,80,0.45)", 24, "血印爆發");
                 }
@@ -1031,9 +1087,21 @@ function basicAttack() {
                 player.x = e.x - Math.cos(backAngle) * 45;
                 player.y = e.y - Math.sin(backAngle) * 45;
                 damageEnemy(e, 22);
+                applyBasicAttackImpact(e, 1.2);
                 addEffect(e.x, e.y, 60, "rgba(120,80,255,0.45)", 20, "背刺");
             }
         }
+    }
+
+    if (hitSomething) {
+        addEffect(
+            player.x + Math.cos(player.attackAngle) * range * 0.55,
+            player.y + Math.sin(player.attackAngle) * range * 0.55,
+            player.empoweredAttack ? 78 : 58,
+            formAccentColor(0.24),
+            12,
+            ""
+        );
     }
 
     player.empoweredAttack = false;
@@ -1927,16 +1995,29 @@ function updateEnemies() {
 
         if (e.type === "exploder") {
             const d = dist(e, target);
-            if (enemyMoveEnabled && d > 6) {
+            const explosionRadius = 92;
+            const fuseMax = 48;
+
+            if (enemyMoveEnabled && d > 6 && e.fuse <= 0) {
                 e.x += Math.cos(a) * spd;
                 e.y += Math.sin(a) * spd;
             }
-            if (d < 48 || e.fuse > 0) {
+
+            // 進入爆炸距離後開始讀條。視覺提示在 drawEnemies() 裡畫：
+            // 固定外圈 = 爆炸範圍；內圈由內向外擴張；兩圈重疊時爆炸。
+            if (d < 56 || e.fuse > 0) {
                 e.fuse++;
-                addEffect(e.x, e.y, 22 + e.fuse * 2, "rgba(255,90,40,0.22)", 6);
-                if (e.fuse >= 28) {
-                    addEffect(e.x, e.y, 88, "rgba(255,80,30,0.52)", 24, "爆裂");
-                    if (dist(e, player) < 92) hurtPlayer(18);
+                e.explosionRadius = explosionRadius;
+                e.fuseMax = fuseMax;
+
+                if (e.fuse === 1) {
+                    addEffect(e.x, e.y, explosionRadius, "rgba(255,50,30,0.28)", 12, "危險");
+                }
+
+                if (e.fuse >= fuseMax) {
+                    addEffect(e.x, e.y, explosionRadius, "rgba(255,80,30,0.58)", 26, "爆裂");
+                    screenShake = Math.max(screenShake, 12);
+                    if (dist(e, player) < explosionRadius) hurtPlayer(18);
                     const i = enemies.indexOf(e);
                     if (i >= 0) enemies.splice(i, 1);
                     continue;
@@ -2518,27 +2599,73 @@ function drawPlayer() {
     ctx.restore();
 
     if (player.attackTime > 0) {
+        const slashT = player.attackTime / 14;
+        const slashRange = getBasicAttackRange();
+        const slashArc = getBasicAttackArc();
+
         ctx.save();
         ctx.translate(player.x, player.y);
         ctx.rotate(player.attackAngle);
-        ctx.strokeStyle = player.empoweredAttack ? "#a48cff" : "#ffffff";
-        ctx.lineWidth = 4;
+
+        ctx.globalAlpha = 0.35 + slashT * 0.45;
+        ctx.strokeStyle = player.empoweredAttack ? "#a48cff" : formAccentColor(0.95);
+        ctx.lineWidth = player.empoweredAttack ? 7 : 5;
         ctx.beginPath();
-        ctx.arc(0, 0, player.empoweredAttack ? 95 : player.form === "Blood Bat" ? 65 : 52, -0.45, 0.45);
+        ctx.arc(0, 0, slashRange, -slashArc / 2, slashArc / 2);
         ctx.stroke();
+
+        ctx.globalAlpha = 0.18 + slashT * 0.18;
+        ctx.fillStyle = formAccentColor(0.28);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, slashRange, -slashArc / 2, slashArc / 2);
+        ctx.closePath();
+        ctx.fill();
+
         ctx.restore();
     }
 
     if (player.parryTime > 0) {
-        const pRatio = player.parryTime / 18;
+        const activeRatio = player.parryTime / 18;
+        const perfectRatio = player.perfectParryTime / 6;
+
         ctx.save();
-        ctx.strokeStyle = player.perfectParryTime > 0 ? "#fff27a" : "#9edcff";
-        ctx.fillStyle = player.perfectParryTime > 0 ? "rgba(255,240,120,0.12)" : "rgba(90,190,255,0.10)";
-        ctx.lineWidth = player.perfectParryTime > 0 ? 5 : 3;
+
+        // 藍色外圈：整個彈反有效時間，讓玩家知道彈反還剩多久。
+        ctx.strokeStyle = "rgba(120,210,255,0.85)";
+        ctx.fillStyle = "rgba(90,190,255,0.08)";
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(player.x, player.y, 34 + (1 - pRatio) * 14, 0, Math.PI * 2);
+        ctx.arc(player.x, player.y, 38 + (1 - activeRatio) * 18, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+
+        // 金色內圈：完美彈反窗口。金圈消失後仍能普通彈反，但不再是完美。
+        if (player.perfectParryTime > 0) {
+            ctx.strokeStyle = "rgba(255,235,90,0.95)";
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.arc(
+                player.x,
+                player.y,
+                28,
+                -Math.PI / 2,
+                -Math.PI / 2 + Math.PI * 2 * perfectRatio
+            );
+            ctx.stroke();
+
+            ctx.fillStyle = "rgba(255,235,90,0.95)";
+            ctx.font = "bold 12px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("PERFECT", player.x, player.y - 48);
+        } else {
+            ctx.fillStyle = "rgba(150,220,255,0.9)";
+            ctx.font = "bold 12px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("PARRY", player.x, player.y - 48);
+        }
+
+        ctx.textAlign = "left";
         ctx.restore();
     }
 
@@ -2583,6 +2710,41 @@ function drawEnemies() {
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
         ctx.fill();
+
+        if (e.type === "exploder" && e.fuse > 0) {
+            const radius = e.explosionRadius || 92;
+            const fuseMax = e.fuseMax || 48;
+            const ratio = clamp(e.fuse / fuseMax, 0, 1);
+            const innerRadius = radius * ratio;
+
+            ctx.save();
+
+            // 固定外圈：真正爆炸範圍。
+            ctx.strokeStyle = "rgba(255,70,45,0.78)";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 由內往外擴張的紅圈；碰到外圈時爆炸。
+            ctx.strokeStyle = ratio > 0.75 ? "rgba(255,230,180,0.95)" : "rgba(255,55,35,0.9)";
+            ctx.fillStyle = "rgba(255,40,25,0.10)";
+            ctx.lineWidth = ratio > 0.75 ? 5 : 3;
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, innerRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            if (ratio > 0.72) {
+                ctx.fillStyle = "rgba(255,235,210,0.95)";
+                ctx.font = "bold 13px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("爆炸", e.x, e.y - radius - 8);
+                ctx.textAlign = "left";
+            }
+
+            ctx.restore();
+        }
 
         if (e.type === "sniper" && e.aimTime > 0) {
             ctx.save();
