@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>蝙蝠回聲 ECHO OF THE BAT｜v0.5.3</title>
+<title>蝙蝠回聲 ECHO OF THE BAT｜v0.6.0</title>
 <style>
     * {
         box-sizing: border-box;
@@ -92,6 +92,17 @@
         border-radius: 6px;
         padding: 8px 10px;
         text-align: center;
+    }
+
+    #trainer select {
+        margin: 0;
+        padding: 8px 10px;
+        font-size: 13px;
+        background: #151528;
+        color: white;
+        border: 1px solid #666;
+        border-radius: 6px;
+        outline: none;
     }
 
 
@@ -199,7 +210,7 @@
 <div id="startScreen">
     <div id="startPanel">
         <h1>ECHO OF THE BAT</h1>
-        <h2>蝙蝠回聲｜v0.5.2 Boss流程與穩定性修正版</h2>
+        <h2>蝙蝠回聲｜v0.6.0 無盡模式與新怪物版</h2>
         <p>在無盡的黑夜中，一隻年幼的蝙蝠從巢穴中甦醒。牠沒有名字，也沒有記憶，只有體內流動的本能，引導牠穿越這片被怪物吞噬的世界。</p>
         <p><strong>獵殺、成長、進化。</strong> 透過戰鬥累積經驗，選擇你的進化道路，成為掌控鮮血的血蝠、操縱回聲的回聲蝠，或穿梭陰影的影蝠。</p>
 
@@ -222,11 +233,17 @@
             <strong>基本操作</strong><br>
             WASD：移動｜左鍵：普攻｜右鍵：彈反｜E：聲波｜Space：衝刺｜Q：固有技能<br>
             <strong>訓練場快捷鍵</strong><br>
-            1 幼蝠｜2 血蝠｜3 回聲蝠｜4 影蝠｜F1 無敵｜F2 敵人移動｜F3 自動生怪｜F8 清場｜F9 直接進化
+            1 幼蝠｜2 血蝠｜3 回聲蝠｜4 影蝠｜F1 無敵｜F2 敵人移動｜F3 自動生怪｜F4 生成選中怪｜F5 小隊｜F6 雙子Boss｜F8 清場｜F9 直接進化
+        </div>
+
+        <div class="controls-box" id="recordBox">
+            <strong>無盡模式紀錄</strong><br>
+            最高紀錄會保存在此瀏覽器：最高波數 / 擊殺數 / 分數 / 使用型態。
         </div>
 
         <div class="start-actions">
             <button class="primary-btn" onclick="startRunMode()">開始冒險</button>
+            <button onclick="startEndlessMode()">無盡模式</button>
             <button onclick="startTrainingMode()">進入訓練場</button>
             <button onclick="startAsForm('Blood Bat')">訓練：血蝠</button>
             <button onclick="startAsForm('Echo Bat')">訓練：回聲蝠</button>
@@ -242,14 +259,22 @@
     <button id="btnInvincible" onclick="toggleInvincible(this)">F1 無敵：OFF</button>
     <button id="btnEnemyMove" onclick="toggleEnemyMove(this)">F2 敵人移動：ON</button>
     <button id="btnAutoSpawn" onclick="toggleAutoSpawn(this)">F3 自動生怪：OFF</button>
+    <select id="enemySelect">
+        <option value="melee">近戰怪</option>
+        <option value="ranged">遠程怪</option>
+        <option value="heavy">重甲怪</option>
+        <option value="exploder">爆裂怪</option>
+        <option value="summoner">召喚怪</option>
+        <option value="sniper">狙擊怪</option>
+    </select>
     <button onclick="setForm('Young Bat')">1 切換：幼蝠</button>
     <button onclick="setForm('Blood Bat')">2 切換：血蝠</button>
     <button onclick="setForm('Echo Bat')">3 切換：回聲蝠</button>
     <button onclick="setForm('Shadow Bat')">4 切換：影蝠</button>
-    <button onclick="spawnEnemy('melee', true)">F4 滑鼠位置放近戰怪</button>
-    <button onclick="spawnEnemy('ranged', true)">F5 滑鼠位置放遠程怪</button>
-    <button onclick="spawnEnemy('heavy', true)">F6 滑鼠位置放重甲怪</button>
-    <button onclick="spawnBoss(true)">F7 放 Boss</button>
+    <button onclick="spawnSelectedEnemy()">F4 生成選中怪物</button>
+    <button onclick="spawnTrainingSquad()">F5 生成測試小隊</button>
+    <button onclick="spawnTwinBoss(true)">F6 放雙子 Boss</button>
+    <button onclick="spawnBoss(true)">F7 放第一 Boss</button>
     <button onclick="clearEnemies()">F8 清場</button>
     <button onclick="giveXp()">F9 直接進化</button>
 </div>
@@ -265,8 +290,8 @@
 
 <script>
 const canvas = document.getElementById("game");
-const GAME_VERSION = "v0.5.3 Boss與卡死防護版";
-const BUILD_DATE = "2026-06-05";
+const GAME_VERSION = "v0.6.0 無盡模式與新怪物版";
+const BUILD_DATE = "2026-06-06";
 const ctx = canvas.getContext("2d");
 
 function resize() {
@@ -312,9 +337,9 @@ window.addEventListener("keydown", e => {
     if (e.key === "F1") { e.preventDefault(); toggleInvincible(); }
     if (e.key === "F2") { e.preventDefault(); toggleEnemyMove(); }
     if (e.key === "F3") { e.preventDefault(); toggleAutoSpawn(); }
-    if (e.key === "F4") { e.preventDefault(); spawnEnemy("melee", true); }
-    if (e.key === "F5") { e.preventDefault(); spawnEnemy("ranged", true); }
-    if (e.key === "F6") { e.preventDefault(); spawnEnemy("heavy", true); }
+    if (e.key === "F4") { e.preventDefault(); spawnSelectedEnemy(); }
+    if (e.key === "F5") { e.preventDefault(); spawnTrainingSquad(); }
+    if (e.key === "F6") { e.preventDefault(); spawnTwinBoss(true); }
     if (e.key === "F7") { e.preventDefault(); spawnBoss(true); }
     if (e.key === "F8") { e.preventDefault(); clearEnemies(); }
     if (e.key === "F9") { e.preventDefault(); giveXp(); }
@@ -453,6 +478,13 @@ let runCompletedRooms = new Set();
 let bossRoomState = "none"; // none / guards / boss / clear
 let victoryShown = false;
 
+// v0.6.0：無盡模式與新怪物
+let endlessWave = 0;
+let endlessScore = 0;
+let endlessWaveActive = false;
+let endlessBetweenWaves = 0;
+let endlessRecord = loadEndlessRecord();
+
 const roomDefs = {
     start: {
         key: "start",
@@ -509,6 +541,51 @@ const mapRoutes = {
 
 function getCurrentRoom() {
     return roomDefs[currentRoomKey];
+}
+
+function loadEndlessRecord() {
+    try {
+        const raw = localStorage.getItem("echoOfTheBatEndlessRecord");
+        return raw ? JSON.parse(raw) : { wave: 0, kills: 0, score: 0, time: 0, form: "幼蝠" };
+    } catch (_) {
+        return { wave: 0, kills: 0, score: 0, time: 0, form: "幼蝠" };
+    }
+}
+
+function updateStartRecordBox() {
+    const box = document.getElementById("recordBox");
+    if (!box) return;
+    const r = endlessRecord || { wave: 0, kills: 0, score: 0, time: 0, form: "幼蝠" };
+    box.innerHTML = `<strong>無盡模式紀錄</strong><br>最高波數：${r.wave || 0}｜最高擊殺：${r.kills || 0}｜最高分數：${r.score || 0}｜型態：${r.form || "幼蝠"}`;
+}
+
+function saveEndlessRecord() {
+    const time = getSurvivalSeconds();
+    const score = Math.floor(killCount * 10 + endlessWave * 120 + time);
+    if (!endlessRecord || score > (endlessRecord.score || 0)) {
+        endlessRecord = { wave: endlessWave, kills: killCount, score, time, form: formName() };
+        try { localStorage.setItem("echoOfTheBatEndlessRecord", JSON.stringify(endlessRecord)); } catch (_) {}
+        return true;
+    }
+    return false;
+}
+
+function getSelectedEnemyType() {
+    const select = document.getElementById("enemySelect");
+    return select ? select.value : "melee";
+}
+
+function spawnSelectedEnemy() {
+    spawnEnemy(getSelectedEnemyType(), true);
+}
+
+function spawnTrainingSquad() {
+    const types = ["melee", "ranged", "heavy", "exploder", "summoner", "sniper"];
+    const cx = mouse.x, cy = mouse.y;
+    for (let i = 0; i < types.length; i++) {
+        const a = Math.PI * 2 * i / types.length;
+        spawnEnemy(types[i], false, cx + Math.cos(a) * 95, cy + Math.sin(a) * 95);
+    }
 }
 
 function getArenaRect() {
@@ -615,6 +692,64 @@ function spawnEnemy(type, atMouse = false, forcedX = null, forcedY = null) {
             stagger: 0,
             chargeTime: 0
         });
+    }
+
+
+    if (type === "exploder") {
+        enemies.push({
+            type, x, y, r: 15, hp: 28, maxHp: 28, speed: 1.95, attackCd: 0, fuse: 0,
+            slow: 0, bloodMark: 0, echoMark: 0, shadowMark: 0, hitFlash: 0, stagger: 0
+        });
+    }
+
+    if (type === "summoner") {
+        enemies.push({
+            type, x, y, r: 18, hp: 70, maxHp: 70, speed: 0.55, attackCd: 120, summonCd: 120,
+            slow: 0, bloodMark: 0, echoMark: 0, shadowMark: 0, hitFlash: 0, stagger: 0
+        });
+    }
+
+    if (type === "sniper") {
+        enemies.push({
+            type, x, y, r: 13, hp: 32, maxHp: 32, speed: 0.65, attackCd: rand(80, 140), aimTime: 0, aimAngle: 0,
+            slow: 0, bloodMark: 0, echoMark: 0, shadowMark: 0, hitFlash: 0, stagger: 0
+        });
+    }
+
+    if (type === "twinRed" || type === "twinBlue") {
+        enemies.push({
+            type, x, y, r: 30, hp: 280, maxHp: 280, speed: type === "twinRed" ? 1.55 : 1.35,
+            attackCd: type === "twinRed" ? 65 : 85, actionTime: 0, action: "idle", targetX: 0, targetY: 0,
+            slow: 0, bloodMark: 0, echoMark: 0, shadowMark: 0, hitFlash: 0, stagger: 0, phase: 1
+        });
+    }
+}
+
+function spawnTwinBoss(atMouse = false) {
+    const a = getArenaRect();
+    const baseX = atMouse ? mouse.x : a.x + a.w / 2;
+    const baseY = atMouse ? mouse.y : a.y + 150;
+    spawnEnemy("twinRed", false, baseX - 70, baseY);
+    spawnEnemy("twinBlue", false, baseX + 70, baseY);
+    addEffect(baseX, baseY, 135, "rgba(180,120,255,0.38)", 60, "雙子獵手");
+}
+
+function isTwinType(type) {
+    return type === "twinRed" || type === "twinBlue";
+}
+
+function countTwinBosses() {
+    return enemies.filter(e => isTwinType(e.type)).length;
+}
+
+function checkTwinPhase() {
+    const twins = enemies.filter(e => isTwinType(e.type));
+    if (twins.length === 1 && twins[0].phase === 1) {
+        twins[0].phase = 2;
+        twins[0].speed += 0.55;
+        twins[0].attackCd = 25;
+        addEffect(twins[0].x, twins[0].y, 130, "rgba(255,90,160,0.45)", 70, "雙子狂怒");
+        screenShake = 18;
     }
 }
 
@@ -768,13 +903,20 @@ function damageEnemy(e, amount) {
             fallingAttacks.length = 0;
             player.dashTime = 0;
             addEffect(canvas.width / 2, canvas.height / 2, 160, "rgba(255,220,120,0.35)", 80, "BOSS 擊敗");
+            if (gameMode === "endless") {
+                endlessScore += 600;
+                checkEvolution();
+                return;
+            }
             bossVictory();
             return;
         } else {
             const i = enemies.indexOf(e);
             if (i >= 0) enemies.splice(i, 1);
             killCount++;
-            player.xp += e.type === "heavy" ? 35 : 15;
+            player.xp += e.type === "heavy" ? 35 : isTwinType(e.type) ? 120 : e.type === "summoner" ? 45 : e.type === "sniper" ? 30 : e.type === "exploder" ? 20 : 15;
+            if (gameMode === "endless") endlessScore += isTwinType(e.type) ? 350 : e.type === "heavy" ? 90 : e.type === "summoner" ? 75 : e.type === "sniper" ? 60 : e.type === "exploder" ? 45 : 30;
+            if (isTwinType(e.type)) checkTwinPhase();
         }
 
         checkEvolution();
@@ -1049,6 +1191,22 @@ function startRunMode() {
     showMapSelection("初始房間");
 }
 
+function startEndlessMode() {
+    resetGameState();
+    gameMode = "endless";
+    endlessWave = 0;
+    endlessScore = 0;
+    endlessWaveActive = false;
+    endlessBetweenWaves = 80;
+    currentRoomKey = "small";
+    startScreen.style.display = "none";
+    overlay.style.display = "none";
+    setTrainerVisible(false);
+    gamePaused = false;
+    movePlayerToRoomCenter();
+    showRoomMessage("無盡模式開始", 130);
+}
+
 function startTrainingMode() {
     resetGameState();
     gameMode = "training";
@@ -1295,7 +1453,7 @@ function updateRoomSystem() {
 }
 
 function drawArena() {
-    if (gameMode !== "run") return;
+    if (gameMode !== "run" && gameMode !== "endless") return;
 
     const a = getArenaRect();
     ctx.save();
@@ -1335,7 +1493,7 @@ function drawArena() {
 }
 
 function clampToArena() {
-    if (gameMode !== "run") return;
+    if (gameMode !== "run" && gameMode !== "endless") return;
     const a = getArenaRect();
     player.x = clamp(player.x, a.x + player.r, a.x + a.w - player.r);
     player.y = clamp(player.y, a.y + player.r, a.y + a.h - player.r);
@@ -1402,6 +1560,11 @@ function resetGameState() {
     runCompletedRooms = new Set();
     bossRoomState = "none";
     victoryShown = false;
+    endlessWave = 0;
+    endlessScore = 0;
+    endlessWaveActive = false;
+    endlessBetweenWaves = 0;
+    runtimeErrorShown = false;
     roomMessageTimer = 0;
     roomMessageText = "";
     updateTrainerButtonLabels();
@@ -1422,6 +1585,7 @@ function returnToMainMenu() {
     overlay.style.display = "none";
     startScreen.style.display = "flex";
     setTrainerVisible(true);
+    updateStartRecordBox();
     gamePaused = true;
 }
 
@@ -1432,6 +1596,7 @@ function resumeGame() {
 
 function restartCurrentMode() {
     if (gameMode === "run") startRunMode();
+    else if (gameMode === "endless") startEndlessMode();
     else startTrainingMode();
 }
 
@@ -1760,6 +1925,96 @@ function updateEnemies() {
 
         const a = angleTo(e, target);
 
+        if (e.type === "exploder") {
+            const d = dist(e, target);
+            if (enemyMoveEnabled && d > 6) {
+                e.x += Math.cos(a) * spd;
+                e.y += Math.sin(a) * spd;
+            }
+            if (d < 48 || e.fuse > 0) {
+                e.fuse++;
+                addEffect(e.x, e.y, 22 + e.fuse * 2, "rgba(255,90,40,0.22)", 6);
+                if (e.fuse >= 28) {
+                    addEffect(e.x, e.y, 88, "rgba(255,80,30,0.52)", 24, "爆裂");
+                    if (dist(e, player) < 92) hurtPlayer(18);
+                    const i = enemies.indexOf(e);
+                    if (i >= 0) enemies.splice(i, 1);
+                    continue;
+                }
+            }
+        }
+
+        if (e.type === "summoner") {
+            const d = dist(e, target);
+            if (enemyMoveEnabled) {
+                if (d < 220) { e.x -= Math.cos(a) * spd; e.y -= Math.sin(a) * spd; }
+                else if (d > 320) { e.x += Math.cos(a) * spd; e.y += Math.sin(a) * spd; }
+            }
+            e.summonCd--;
+            if (e.summonCd <= 0 && enemies.length < (gameMode === "endless" ? 28 : 16)) {
+                spawnEnemy("melee", false, e.x + rand(-45, 45), e.y + rand(-45, 45));
+                addEffect(e.x, e.y, 58, "rgba(120,255,150,0.35)", 20, "召喚");
+                e.summonCd = Math.max(80, 150 - endlessWave * 3);
+            }
+        }
+
+        if (e.type === "sniper") {
+            const d = dist(e, target);
+            if (enemyMoveEnabled) {
+                if (d < 300) { e.x -= Math.cos(a) * spd; e.y -= Math.sin(a) * spd; }
+                else if (d > 460) { e.x += Math.cos(a) * spd; e.y += Math.sin(a) * spd; }
+            }
+            if (e.aimTime > 0) {
+                e.aimTime--;
+                if (e.aimTime <= 0) {
+                    shootProjectile(e.x, e.y, e.aimAngle, 11, 16, "enemy", "#ffec6a", 90);
+                    e.attackCd = 130;
+                }
+            } else {
+                e.attackCd--;
+                if (e.attackCd <= 0) {
+                    e.aimAngle = angleTo(e, player);
+                    e.aimTime = 38;
+                    addEffect(e.x, e.y, 44, "rgba(255,230,90,0.35)", 18, "瞄準");
+                }
+            }
+        }
+
+        if (isTwinType(e.type)) {
+            const d = dist(e, target);
+            const phaseSpeed = e.phase === 2 ? spd * 1.25 : spd;
+            if (e.actionTime > 0) {
+                e.actionTime--;
+                if (e.action === "dash") {
+                    const aa = angleTo(e, {x: e.targetX, y: e.targetY});
+                    e.x += Math.cos(aa) * (e.phase === 2 ? 10 : 7.5);
+                    e.y += Math.sin(aa) * (e.phase === 2 ? 10 : 7.5);
+                    if (circleHit(e, player)) hurtPlayer(e.phase === 2 ? 18 : 13);
+                }
+            } else {
+                if (enemyMoveEnabled && d > 70) {
+                    e.x += Math.cos(a) * phaseSpeed;
+                    e.y += Math.sin(a) * phaseSpeed;
+                }
+                e.attackCd--;
+                if (e.attackCd <= 0) {
+                    if (e.type === "twinRed") {
+                        e.action = "dash"; e.actionTime = e.phase === 2 ? 42 : 30; e.targetX = player.x; e.targetY = player.y;
+                        addEffect(e.x, e.y, 70, "rgba(255,80,80,0.38)", 18, "血牙突襲");
+                        e.attackCd = e.phase === 2 ? 55 : 85;
+                    } else {
+                        const side = angleTo(player, e) + Math.PI / 2;
+                        e.x = player.x + Math.cos(side) * 120;
+                        e.y = player.y + Math.sin(side) * 120;
+                        addEffect(player.x, player.y, 72, "rgba(90,150,255,0.26)", 38, "封鎖印記");
+                        if (dist(e, player) < 135) hurtPlayer(e.phase === 2 ? 14 : 10);
+                        e.attackCd = e.phase === 2 ? 65 : 95;
+                    }
+                }
+                if (d < e.r + player.r + 6) hurtPlayer(e.phase === 2 ? 14 : 10);
+            }
+        }
+
         if (e.type === "melee") {
             const targetDistance = dist(e, target);
 
@@ -1989,6 +2244,53 @@ function updateEffects() {
     }
 }
 
+function spawnEndlessWave() {
+    endlessWave++;
+    endlessWaveActive = true;
+    const points = getSpawnPoints();
+    let wave = [];
+
+    const baseCount = 3 + Math.floor(endlessWave * 0.65);
+    for (let i = 0; i < baseCount; i++) wave.push("melee");
+    if (endlessWave >= 2) wave.push("ranged");
+    if (endlessWave >= 3) wave.push("exploder");
+    if (endlessWave >= 4) wave.push("heavy");
+    if (endlessWave >= 5) wave.push("sniper");
+    if (endlessWave >= 6) wave.push("summoner");
+    if (endlessWave % 5 === 0) wave.push("heavy", "sniper");
+
+    if (endlessWave % 10 === 0) {
+        spawnTwinBoss(false);
+    } else if (endlessWave % 7 === 0) {
+        spawnBoss(false);
+    }
+
+    for (let i = 0; i < wave.length; i++) {
+        const p = points[i % points.length];
+        spawnEnemy(wave[i], false, p.x + rand(-30, 30), p.y + rand(-30, 30));
+    }
+    showRoomMessage(`無盡模式｜第 ${endlessWave} 波`, 110);
+}
+
+function updateEndlessSystem() {
+    if (gameMode !== "endless" || gamePaused || gameOver) return;
+    if (roomMessageTimer > 0) roomMessageTimer--;
+
+    if (!endlessWaveActive && enemies.length === 0 && !boss) {
+        endlessBetweenWaves--;
+        if (endlessBetweenWaves <= 0) spawnEndlessWave();
+    }
+
+    if (endlessWaveActive && enemies.length === 0 && !boss) {
+        endlessWaveActive = false;
+        endlessScore += endlessWave * 100;
+        healPlayer(6 + Math.min(16, endlessWave));
+        endlessBetweenWaves = 95;
+        showRoomMessage("波次清理完成", 85);
+        checkEvolution();
+    }
+}
+
 function updateSpawning() {
     if (gameMode === "run") return;
     if (!autoSpawnEnabled) return;
@@ -1997,7 +2299,7 @@ function updateSpawning() {
 
     if (spawnTimer <= 0) {
         if (enemies.length < 10) {
-            spawnEnemy("melee");
+            spawnEnemy(getSelectedEnemyType());
         }
         spawnTimer = 70;
     }
@@ -2027,6 +2329,15 @@ function drawUI() {
     ctx.fillText(`型態：${formName()}`, 20, 88);
     ctx.fillText(`聲波：${Math.floor(player.echoCharges)} / ${player.maxEchoCharges}　衝刺：${Math.floor(player.dashCharges)} / ${player.maxDashCharges}`, 20, 113);
     ctx.fillText(`擊殺：${killCount}　時間：${getSurvivalSeconds()}秒`, 20, 138);
+
+    if (gameMode === "endless") {
+        const score = Math.floor(killCount * 10 + endlessWave * 120 + getSurvivalSeconds() + endlessScore);
+        ctx.fillStyle = "#ffdf7a";
+        ctx.fillText(`無盡：第 ${endlessWave} 波｜分數 ${score}`, 20, 163);
+        ctx.fillStyle = "rgba(255,255,255,0.72)";
+        ctx.fillText(`最高：第 ${endlessRecord.wave || 0} 波｜${endlessRecord.score || 0} 分｜${endlessRecord.form || "幼蝠"}`, 20, 188);
+        ctx.fillStyle = "white";
+    }
 
     if (player.globalDamageBonus > 0 || player.dashRechargeRate > 1 || player.healMultiplier < 1) {
         ctx.fillStyle = "rgba(255,255,255,0.78)";
@@ -2058,6 +2369,13 @@ function drawUI() {
 
     if (boss) {
         drawBar(canvas.width / 2 - 220, 25, 440, 18, boss.hp / boss.maxHp, "#9b2cff", `Boss 第 ${boss.phase} 階段`);
+    }
+
+    const twins = enemies.filter(e => isTwinType(e.type));
+    if (twins.length > 0) {
+        let totalHp = 0, totalMax = 0;
+        for (const t of twins) { totalHp += Math.max(0, t.hp); totalMax += t.maxHp; }
+        drawBar(canvas.width / 2 - 220, boss ? 50 : 25, 440, 18, totalHp / totalMax, "#d84cff", twins.length === 2 ? "雙子獵手" : "雙子狂怒");
     }
 
     if (roomMessageTimer > 0 && roomMessageText) {
@@ -2204,11 +2522,36 @@ function drawEnemies() {
         ctx.fillStyle = e.hitFlash > 0 ? "#ffffff" :
             e.type === "melee" ? "#ff6b6b" :
             e.type === "ranged" ? "#ffb347" :
-            "#b45cff";
+            e.type === "heavy" ? "#b45cff" :
+            e.type === "exploder" ? "#ff552f" :
+            e.type === "summoner" ? "#6dff9a" :
+            e.type === "sniper" ? "#ffe66a" :
+            e.type === "twinRed" ? "#ff365d" :
+            e.type === "twinBlue" ? "#4b8dff" :
+            "#cccccc";
 
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
         ctx.fill();
+
+        if (e.type === "sniper" && e.aimTime > 0) {
+            ctx.save();
+            ctx.strokeStyle = "rgba(255,230,90,0.55)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(e.x, e.y);
+            ctx.lineTo(e.x + Math.cos(e.aimAngle) * 900, e.y + Math.sin(e.aimAngle) * 900);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        if (isTwinType(e.type)) {
+            ctx.fillStyle = "rgba(255,255,255,0.85)";
+            ctx.font = "12px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(e.type === "twinRed" ? "赤獵" : "蒼獵", e.x, e.y - e.r - 22);
+            ctx.textAlign = "left";
+        }
 
         drawMarks(e);
 
@@ -2313,6 +2656,7 @@ function update() {
     updateEffects();
     updateSpawning();
     updateRoomSystem();
+    updateEndlessSystem();
 }
 
 function draw() {
@@ -2361,9 +2705,11 @@ function bossVictory() {
 function endGame() {
     gameOver = true;
     gamePaused = true;
+    const newRecord = gameMode === "endless" ? saveEndlessRecord() : false;
     overlay.style.display = "flex";
-    overlayTitle.textContent = "黑夜吞噬了你的回聲";
-    overlayText.innerHTML = `最終型態：${formName()}<br>經驗：${player.xp}｜擊殺數：${killCount}｜存活時間：${getSurvivalSeconds()} 秒`;
+    overlayTitle.textContent = gameMode === "endless" ? (newRecord ? "新的無盡紀錄" : "無盡狩獵結束") : "黑夜吞噬了你的回聲";
+    const endlessText = gameMode === "endless" ? `<br>無盡波數：${endlessWave}｜分數：${endlessRecord.score}｜最高波數：${endlessRecord.wave}` : "";
+    overlayText.innerHTML = `最終型態：${formName()}<br>經驗：${player.xp}｜擊殺數：${killCount}｜存活時間：${getSurvivalSeconds()} 秒${endlessText}`;
     buttons.innerHTML = "";
     addButton("重新開始", "重置本局，重新開始目前模式。", restartCurrentMode);
     addButton("返回主選單", "回到開始畫面，再次選擇進化道路。", returnToMainMenu);
@@ -2382,6 +2728,7 @@ function loop() {
 
 // 訓練場預設空場，請用右上角按鈕手動放置敵人。
 updateTrainerButtonLabels();
+updateStartRecordBox();
 loop();
 </script>
 </body>
