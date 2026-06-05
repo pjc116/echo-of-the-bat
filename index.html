@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>蝙蝠回聲 ECHO OF THE BAT｜v0.6.2</title>
+<title>蝙蝠回聲 ECHO OF THE BAT｜v0.6.3</title>
 <style>
     * {
         box-sizing: border-box;
@@ -103,6 +103,49 @@
         border: 1px solid #666;
         border-radius: 6px;
         outline: none;
+    }
+
+
+    .settings-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 14px;
+        text-align: left;
+    }
+
+    .setting-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid rgba(255,255,255,0.16);
+        border-radius: 10px;
+        background: rgba(255,255,255,0.05);
+    }
+
+    .setting-row .label {
+        color: #ddd;
+        font-size: 14px;
+    }
+
+    .setting-row button {
+        margin: 0;
+        min-width: 92px;
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+
+    .setting-note {
+        margin-top: 12px;
+        color: #b8d7ff;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    @media (max-width: 760px) {
+        .settings-grid { grid-template-columns: 1fr; }
     }
 
 
@@ -210,7 +253,7 @@
 <div id="startScreen">
     <div id="startPanel">
         <h1>ECHO OF THE BAT</h1>
-        <h2>蝙蝠回聲｜v0.6.2 戰鬥手感更新版</h2>
+        <h2>蝙蝠回聲｜v0.6.3 設定與衝刺優化版</h2>
         <p>在無盡的黑夜中，一隻年幼的蝙蝠從巢穴中甦醒。牠沒有名字，也沒有記憶，只有體內流動的本能，引導牠穿越這片被怪物吞噬的世界。</p>
         <p><strong>獵殺、成長、進化。</strong> 透過戰鬥累積經驗，選擇你的進化道路，成為掌控鮮血的血蝠、操縱回聲的回聲蝠，或穿梭陰影的影蝠。</p>
 
@@ -244,6 +287,7 @@
         <div class="start-actions">
             <button class="primary-btn" onclick="startRunMode()">開始冒險</button>
             <button onclick="startEndlessMode()">無盡模式</button>
+            <button onclick="showSettingsOverlay('menu')">設定</button>
             <button onclick="startTrainingMode()">進入訓練場</button>
             <button onclick="startAsForm('Blood Bat')">訓練：血蝠</button>
             <button onclick="startAsForm('Echo Bat')">訓練：回聲蝠</button>
@@ -290,7 +334,7 @@
 
 <script>
 const canvas = document.getElementById("game");
-const GAME_VERSION = "v0.6.2 戰鬥手感更新版";
+const GAME_VERSION = "v0.6.3 設定與衝刺優化版";
 const BUILD_DATE = "2026-06-06";
 const ctx = canvas.getContext("2d");
 
@@ -304,8 +348,192 @@ resize();
 const keys = {};
 const mouse = { x: canvas.width / 2, y: canvas.height / 2, down: false };
 
+const DEFAULT_CONTROLS = {
+    up: "w",
+    down: "s",
+    left: "a",
+    right: "d",
+    dash: " ",
+    echo: "e",
+    skill: "q",
+    dashMode: "mouse"
+};
+
+let controlSettings = loadControlSettings();
+let waitingForBind = null;
+let waitingForBindBackTarget = "pause";
+
+function normalizeKey(key) {
+    if (key === " ") return " ";
+    return String(key || "").toLowerCase();
+}
+
+function loadControlSettings() {
+    try {
+        const raw = localStorage.getItem("echoOfTheBatControls");
+        if (!raw) return { ...DEFAULT_CONTROLS };
+        return { ...DEFAULT_CONTROLS, ...JSON.parse(raw) };
+    } catch (_) {
+        return { ...DEFAULT_CONTROLS };
+    }
+}
+
+function saveControlSettings() {
+    try {
+        localStorage.setItem("echoOfTheBatControls", JSON.stringify(controlSettings));
+    } catch (_) {}
+}
+
+function keyLabel(key) {
+    if (key === " ") return "Space";
+    if (key === "arrowup") return "↑";
+    if (key === "arrowdown") return "↓";
+    if (key === "arrowleft") return "←";
+    if (key === "arrowright") return "→";
+    return String(key || "").toUpperCase();
+}
+
+function isControlDown(action) {
+    return !!keys[controlSettings[action]];
+}
+
+function controlDescription() {
+    return `${keyLabel(controlSettings.up)}${keyLabel(controlSettings.left)}${keyLabel(controlSettings.down)}${keyLabel(controlSettings.right)}：移動｜左鍵：普攻｜右鍵：彈反｜${keyLabel(controlSettings.echo)}：聲波｜${keyLabel(controlSettings.dash)}：衝刺｜${keyLabel(controlSettings.skill)}：固有技能`;
+}
+
+function updateControlsHelpText() {
+    const boxes = document.querySelectorAll(".controls-box");
+    if (!boxes || boxes.length === 0) return;
+    const first = boxes[0];
+    if (!first) return;
+    first.innerHTML = `
+            <strong>基本操作</strong><br>
+            ${controlDescription()}<br>
+            <strong>訓練場快捷鍵</strong><br>
+            1 幼蝠｜2 血蝠｜3 回聲蝠｜4 影蝠｜F1 無敵｜F2 敵人移動｜F3 自動生怪｜F4 生成選中怪｜F5 小隊｜F6 雙子Boss｜F8 清場｜F9 直接進化
+        `;
+}
+
+function matchesControl(eventKey, action) {
+    return normalizeKey(eventKey) === controlSettings[action];
+}
+
+function setDashMode(mode) {
+    controlSettings.dashMode = mode;
+    saveControlSettings();
+    showSettingsOverlay(waitingForBindBackTarget || "pause");
+}
+
+function startRebind(action, backTarget = "pause") {
+    waitingForBind = action;
+    waitingForBindBackTarget = backTarget;
+    showSettingsOverlay(backTarget);
+}
+
+function finishRebind(key) {
+    if (!waitingForBind) return;
+    controlSettings[waitingForBind] = normalizeKey(key);
+    waitingForBind = null;
+    saveControlSettings();
+    updateControlsHelpText();
+    showSettingsOverlay(waitingForBindBackTarget || "pause");
+}
+
+function resetControls() {
+    controlSettings = { ...DEFAULT_CONTROLS };
+    waitingForBind = null;
+    saveControlSettings();
+    updateControlsHelpText();
+    showSettingsOverlay(waitingForBindBackTarget || "pause");
+}
+
+function showSettingsOverlay(backTarget = "pause") {
+    waitingForBindBackTarget = backTarget;
+    gamePaused = true;
+    if (backTarget === "menu") startScreen.style.display = "none";
+    overlay.style.display = "flex";
+    overlayTitle.textContent = "設定";
+    const waitingText = waitingForBind
+        ? `<div class="setting-note">正在設定「${controlActionName(waitingForBind)}」：請按下新的鍵。按 ESC 取消。</div>`
+        : `<div class="setting-note">衝刺方向建議用「WASD優先」：有按移動鍵就照移動方向衝，沒按移動鍵才照滑鼠方向衝。</div>`;
+
+    overlayText.innerHTML = `
+        <strong>衝刺方向</strong><br>
+        目前：${controlSettings.dashMode === "mouse" ? "滑鼠方向" : "WASD優先"}<br>
+        ${waitingText}
+        <div class="settings-grid">
+            ${settingRow("上", "up", backTarget)}
+            ${settingRow("下", "down", backTarget)}
+            ${settingRow("左", "left", backTarget)}
+            ${settingRow("右", "right", backTarget)}
+            ${settingRow("衝刺", "dash", backTarget)}
+            ${settingRow("聲波", "echo", backTarget)}
+            ${settingRow("固有技能", "skill", backTarget)}
+        </div>
+    `;
+
+    buttons.innerHTML = "";
+    addButton("衝刺：滑鼠方向", "Space 永遠往滑鼠方向衝。", () => setDashMode("mouse"));
+    addButton("衝刺：WASD優先", "有按移動鍵就照移動方向衝，沒按才照滑鼠衝。", () => setDashMode("wasdFirst"));
+    addButton("重置預設", "恢復 WASD / Space / E / Q。", resetControls);
+    if (backTarget === "menu") {
+        addButton("返回主選單", "回到開始畫面。", () => {
+            waitingForBind = null;
+            overlay.style.display = "none";
+            startScreen.style.display = "flex";
+            gamePaused = true;
+        });
+    } else {
+        addButton("返回暫停選單", "回到暫停選單。", () => {
+            waitingForBind = null;
+            showPauseMenu();
+        });
+        addButton("繼續遊戲", "套用設定並回到戰場。", () => {
+            waitingForBind = null;
+            resumeGame();
+        });
+    }
+}
+
+function controlActionName(action) {
+    const names = {
+        up: "上",
+        down: "下",
+        left: "左",
+        right: "右",
+        dash: "衝刺",
+        echo: "聲波",
+        skill: "固有技能"
+    };
+    return names[action] || action;
+}
+
+function settingRow(label, action, backTarget) {
+    return `
+        <div class="setting-row">
+            <span class="label">${label}</span>
+            <button onclick="startRebind('${action}', '${backTarget}')">${keyLabel(controlSettings[action])}</button>
+        </div>
+    `;
+}
+
+updateControlsHelpText();
+
+
 window.addEventListener("keydown", e => {
-    keys[e.key.toLowerCase()] = true;
+    const k = normalizeKey(e.key);
+    keys[k] = true;
+
+    if (waitingForBind) {
+        e.preventDefault();
+        if (e.key === "Escape") {
+            waitingForBind = null;
+            showSettingsOverlay(waitingForBindBackTarget || "pause");
+        } else {
+            finishRebind(e.key);
+        }
+        return;
+    }
 
     if (e.key === "Escape") {
         e.preventDefault();
@@ -321,9 +549,9 @@ window.addEventListener("keydown", e => {
         return;
     }
 
-    if (e.key === " ") dash();
-    if (e.key.toLowerCase() === "e") echoWave();
-    if (e.key.toLowerCase() === "q") useSkill();
+    if (matchesControl(e.key, "dash")) { e.preventDefault(); dash(); }
+    if (matchesControl(e.key, "echo")) { e.preventDefault(); echoWave(); }
+    if (matchesControl(e.key, "skill")) { e.preventDefault(); useSkill(); }
 
     // 主選單或彈窗開啟時，不觸發訓練場快捷鍵，避免誤切型態。
     if (startScreen.style.display !== "none" || overlay.style.display === "flex") return;
@@ -345,7 +573,7 @@ window.addEventListener("keydown", e => {
     if (e.key === "F9") { e.preventDefault(); giveXp(); }
 });
 
-window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+window.addEventListener("keyup", e => keys[normalizeKey(e.key)] = false);
 
 canvas.addEventListener("mousemove", e => {
     mouse.x = e.clientX;
@@ -1111,13 +1339,38 @@ function dash() {
     if (gamePaused || gameOver) return;
     if (player.dashCharges < 1) return;
 
-    const a = angleTo(player, mouse);
+    let dx = 0;
+    let dy = 0;
+
+    if (controlSettings.dashMode === "wasdFirst") {
+        if (isControlDown("up")) dy--;
+        if (isControlDown("down")) dy++;
+        if (isControlDown("left")) dx--;
+        if (isControlDown("right")) dx++;
+
+        if (dx !== 0 || dy !== 0) {
+            const len = Math.hypot(dx, dy);
+            dx /= len;
+            dy /= len;
+        } else {
+            const a = angleTo(player, mouse);
+            dx = Math.cos(a);
+            dy = Math.sin(a);
+        }
+    } else {
+        const a = angleTo(player, mouse);
+        dx = Math.cos(a);
+        dy = Math.sin(a);
+    }
+
     player.dashCharges--;
     player.dashHitSet.clear();
     player.dashTime = 10;
     player.dashInvuln = player.form === "Shadow Bat" ? 14 : 5;
-    player.dashVx = Math.cos(a) * (player.form === "Shadow Bat" ? 15 : 11);
-    player.dashVy = Math.sin(a) * (player.form === "Shadow Bat" ? 15 : 11);
+
+    const dashSpeed = player.form === "Shadow Bat" ? 15 : 11;
+    player.dashVx = dx * dashSpeed;
+    player.dashVy = dy * dashSpeed;
 
     if (player.form === "Shadow Bat") {
         player.empoweredAttack = true;
@@ -1654,6 +1907,7 @@ function returnToMainMenu() {
     startScreen.style.display = "flex";
     setTrainerVisible(true);
     updateStartRecordBox();
+    updateControlsHelpText();
     gamePaused = true;
 }
 
@@ -1679,6 +1933,7 @@ function showPauseMenu() {
     addButton("重新開始", "重置本局，重新開始目前模式。", restartCurrentMode);
     addButton("返回主選單", "回到開始畫面與世界觀介紹。", returnToMainMenu);
     addButton("操作說明", "查看基本操作與訓練場快捷鍵。", showControlsOverlay);
+    addButton("設定", "調整按鍵與衝刺方向。", () => showSettingsOverlay("pause"));
 }
 
 function showControlsOverlay() {
@@ -1687,13 +1942,16 @@ function showControlsOverlay() {
     overlayTitle.textContent = "操作說明";
     overlayText.innerHTML = `
         <strong>基本操作</strong><br>
-        WASD：移動｜左鍵：普攻｜右鍵：彈反｜E：聲波｜Space：衝刺｜Q：固有技能<br><br>
+        ${controlDescription()}<br><br>
+        <strong>衝刺方向</strong><br>
+        ${controlSettings.dashMode === "mouse" ? "滑鼠方向：衝刺永遠朝滑鼠。" : "WASD優先：有按移動鍵朝移動方向，沒按才朝滑鼠。"}<br><br>
         <strong>訓練場快捷鍵</strong><br>
         1 幼蝠｜2 血蝠｜3 回聲蝠｜4 影蝠<br>
-        F1 無敵｜F2 敵人移動｜F3 自動生怪｜F4 近戰｜F5 遠程｜F6 重甲｜F7 Boss｜F8 清場｜F9 直接進化
+        F1 無敵｜F2 敵人移動｜F3 自動生怪｜F4 生成選中怪｜F5 小隊｜F6 雙子Boss｜F7 第一Boss｜F8 清場｜F9 直接進化
     `;
     buttons.innerHTML = "";
     addButton("返回暫停選單", "回到暫停選單。", showPauseMenu);
+    addButton("設定", "調整按鍵與衝刺方向。", () => showSettingsOverlay("pause"));
     addButton("繼續遊戲", "關閉說明並回到戰場。", resumeGame);
 }
 
@@ -1930,10 +2188,10 @@ function updatePlayer() {
         }
     } else {
         let vx = 0, vy = 0;
-        if (keys["w"] || keys["arrowup"]) vy--;
-        if (keys["s"] || keys["arrowdown"]) vy++;
-        if (keys["a"] || keys["arrowleft"]) vx--;
-        if (keys["d"] || keys["arrowright"]) vx++;
+        if (isControlDown("up")) vy--;
+        if (isControlDown("down")) vy++;
+        if (isControlDown("left")) vx--;
+        if (isControlDown("right")) vx++;
 
         const len = Math.hypot(vx, vy);
         if (len > 0) {
