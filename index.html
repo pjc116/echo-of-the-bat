@@ -94,6 +94,16 @@
         text-align: center;
     }
 
+    #trainer .help {
+        font-size: 12px;
+        line-height: 1.45;
+        color: #cfcfe8;
+        background: rgba(0,0,0,0.28);
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 8px 10px;
+    }
+
 </style>
 </head>
 <body>
@@ -101,19 +111,24 @@
 
 <div id="trainer">
     <div class="title">訓練場</div>
-    <button onclick="toggleInvincible(this)">無敵：OFF</button>
-    <button onclick="toggleEnemyMove(this)">敵人移動：ON</button>
-    <button onclick="toggleAutoSpawn(this)">自動生怪：OFF</button>
-    <button onclick="setForm('Young Bat')">切換：幼蝠</button>
-    <button onclick="setForm('Blood Bat')">切換：血蝠</button>
-    <button onclick="setForm('Echo Bat')">切換：回聲蝠</button>
-    <button onclick="setForm('Shadow Bat')">切換：影蝠</button>
-    <button onclick="spawnEnemy('melee', true)">滑鼠位置放近戰怪</button>
-    <button onclick="spawnEnemy('ranged', true)">滑鼠位置放遠程怪</button>
-    <button onclick="spawnEnemy('heavy', true)">滑鼠位置放重甲怪</button>
-    <button onclick="spawnBoss(true)">放 Boss</button>
-    <button onclick="clearEnemies()">清場</button>
-    <button onclick="giveXp()">直接進化</button>
+    <div class="help">
+        快捷鍵：1幼 / 2血 / 3聲 / 4影<br>
+        F1無敵｜F2敵動｜F3自動生怪<br>
+        F4近戰｜F5遠程｜F6重甲｜F7 Boss｜F8清場｜F9進化
+    </div>
+    <button id="btnInvincible" onclick="toggleInvincible(this)">F1 無敵：OFF</button>
+    <button id="btnEnemyMove" onclick="toggleEnemyMove(this)">F2 敵人移動：ON</button>
+    <button id="btnAutoSpawn" onclick="toggleAutoSpawn(this)">F3 自動生怪：OFF</button>
+    <button onclick="setForm('Young Bat')">1 切換：幼蝠</button>
+    <button onclick="setForm('Blood Bat')">2 切換：血蝠</button>
+    <button onclick="setForm('Echo Bat')">3 切換：回聲蝠</button>
+    <button onclick="setForm('Shadow Bat')">4 切換：影蝠</button>
+    <button onclick="spawnEnemy('melee', true)">F4 滑鼠位置放近戰怪</button>
+    <button onclick="spawnEnemy('ranged', true)">F5 滑鼠位置放遠程怪</button>
+    <button onclick="spawnEnemy('heavy', true)">F6 滑鼠位置放重甲怪</button>
+    <button onclick="spawnBoss(true)">F7 放 Boss</button>
+    <button onclick="clearEnemies()">F8 清場</button>
+    <button onclick="giveXp()">F9 直接進化</button>
 </div>
 
 
@@ -127,6 +142,8 @@
 
 <script>
 const canvas = document.getElementById("game");
+const GAME_VERSION = "v0.2.3 訓練場快捷鍵版";
+const BUILD_DATE = "2026-06-05";
 const ctx = canvas.getContext("2d");
 
 function resize() {
@@ -145,6 +162,22 @@ window.addEventListener("keydown", e => {
     if (e.key === " ") dash();
     if (e.key.toLowerCase() === "e") echoWave();
     if (e.key.toLowerCase() === "q") useSkill();
+
+    // 訓練場快捷鍵
+    if (e.key === "1") setForm("Young Bat");
+    if (e.key === "2") setForm("Blood Bat");
+    if (e.key === "3") setForm("Echo Bat");
+    if (e.key === "4") setForm("Shadow Bat");
+
+    if (e.key === "F1") { e.preventDefault(); toggleInvincible(); }
+    if (e.key === "F2") { e.preventDefault(); toggleEnemyMove(); }
+    if (e.key === "F3") { e.preventDefault(); toggleAutoSpawn(); }
+    if (e.key === "F4") { e.preventDefault(); spawnEnemy("melee", true); }
+    if (e.key === "F5") { e.preventDefault(); spawnEnemy("ranged", true); }
+    if (e.key === "F6") { e.preventDefault(); spawnEnemy("heavy", true); }
+    if (e.key === "F7") { e.preventDefault(); spawnBoss(true); }
+    if (e.key === "F8") { e.preventDefault(); clearEnemies(); }
+    if (e.key === "F9") { e.preventDefault(); giveXp(); }
 });
 
 window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
@@ -233,7 +266,11 @@ const player = {
     bloodRage: 0,
     shadowHunt: 0,
     invisible: 0,
+    dashHitSet: new Set(),
+
     hitFlash: 0,
+    skillCooldown: 0,
+    maxSkillCooldown: 360
 };
 
 const enemies = [];
@@ -270,7 +307,9 @@ function spawnEnemy(type, atMouse = false) {
             slow: 0,
             bloodMark: 0,
             echoMark: 0,
-            shadowMark: 0
+            shadowMark: 0,
+            hitFlash: 0,
+            stagger: 0
         });
     }
 
@@ -286,7 +325,9 @@ function spawnEnemy(type, atMouse = false) {
             slow: 0,
             bloodMark: 0,
             echoMark: 0,
-            shadowMark: 0
+            shadowMark: 0,
+            hitFlash: 0,
+            stagger: 0
         });
     }
 
@@ -303,6 +344,8 @@ function spawnEnemy(type, atMouse = false) {
             bloodMark: 0,
             echoMark: 0,
             shadowMark: 0,
+            hitFlash: 0,
+            stagger: 0,
             chargeTime: 0
         });
     }
@@ -325,12 +368,108 @@ function spawnBoss(atMouse = false) {
         bloodMark: 0,
         echoMark: 0,
         shadowMark: 0,
+        hitFlash: 0,
+        stagger: 0,
         slow: 0
     };
 }
 
 function addEffect(x, y, r, color, life, text = "") {
     effects.push({ x, y, r, color, life, maxLife: life, text });
+}
+
+function formAccentColor(alpha = 1) {
+    if (player.form === "Blood Bat") return `rgba(255, 50, 95, ${alpha})`;
+    if (player.form === "Echo Bat") return `rgba(70, 225, 255, ${alpha})`;
+    if (player.form === "Shadow Bat") return `rgba(150, 110, 255, ${alpha})`;
+    return `rgba(220, 220, 255, ${alpha})`;
+}
+
+function skillName() {
+    if (player.form === "Blood Bat") return "血爆";
+    if (player.form === "Echo Bat") return "共振";
+    if (player.form === "Shadow Bat") return "影獵";
+    return "固有";
+}
+
+function getBloodBonusPercent() {
+    if (player.form !== "Blood Bat") return 0;
+    const missing = 1 - player.hp / player.maxHp;
+    let bonus = missing * 120;
+    if (player.bloodRage > 0) bonus += 25;
+    return Math.max(0, Math.round(bonus));
+}
+
+function drawCooldownCircle(x, y, radius, ratio, color, label, countText, shape = "circle") {
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+
+    ctx.fillStyle = "rgba(0,0,0,0.48)";
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 2;
+
+    if (shape === "diamond") {
+        ctx.beginPath();
+        ctx.moveTo(x, y - radius);
+        ctx.lineTo(x + radius, y);
+        ctx.lineTo(x, y + radius);
+        ctx.lineTo(x - radius, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    } else {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, radius - 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(ratio, 0, 1));
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.65;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(x, y, radius - 1, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(ratio, 0, 1));
+    ctx.stroke();
+
+    ctx.fillStyle = "white";
+    ctx.font = "12px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(countText, x, y);
+
+    ctx.font = "11px Arial";
+    ctx.fillText(label, x, y + radius + 12);
+    ctx.restore();
+}
+
+function drawLowHpWarning() {
+    const hpRate = player.hp / player.maxHp;
+    if (hpRate > 0.5 || gameOver) return;
+
+    let alpha = 0.08;
+    let line = 22;
+    if (hpRate <= 0.3) {
+        alpha = 0.15 + Math.sin(Date.now() / 170) * 0.05;
+        line = 34;
+    }
+    if (hpRate <= 0.15) {
+        alpha = 0.24 + Math.sin(Date.now() / 90) * 0.09;
+        line = 46;
+    }
+
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,0,30,${alpha})`;
+    ctx.lineWidth = line;
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
 }
 
 function damageEnemy(e, amount) {
@@ -343,7 +482,9 @@ function damageEnemy(e, amount) {
     if (player.shadowHunt > 0) amount *= 1.15;
 
     e.hp -= amount;
-    addEffect(e.x, e.y, 20, "rgba(255,255,255,0.25)", 12, Math.floor(amount).toString());
+    e.hitFlash = 8;
+    addEffect(e.x, e.y, amount >= 35 ? 36 : 20, amount >= 35 ? "rgba(255,255,160,0.48)" : "rgba(255,255,255,0.25)", 12, Math.floor(amount).toString());
+    if (amount >= 35) addEffect(e.x, e.y, 52, "rgba(255,230,120,0.35)", 16, "重擊");
 
     if (e.hp <= 0) {
         if (e === boss) {
@@ -380,9 +521,9 @@ function hurtPlayer(amount) {
     }
 
     player.hp -= amount;
-    player.hitFlash = 10;
-    screenShake = 10;
-    addEffect(player.x, player.y, 35, "rgba(255,0,0,0.35)", 18);
+    player.hitFlash = 12;
+    screenShake = Math.max(screenShake, amount >= 15 ? 16 : 10);
+    addEffect(player.x, player.y, amount >= 15 ? 52 : 35, "rgba(255,0,0,0.42)", 18, amount >= 15 ? "受擊" : "");
 
     if (player.hp <= 0) {
         player.hp = 0;
@@ -391,9 +532,19 @@ function hurtPlayer(amount) {
 }
 
 function successfulParry(perfect) {
-    hitStop = perfect ? 8 : 4;
-    screenShake = perfect ? 8 : 4;
-    addEffect(player.x, player.y, perfect ? 60 : 40, perfect ? "rgba(255,240,120,0.7)" : "rgba(180,220,255,0.45)", perfect ? 22 : 14, perfect ? "完美彈反" : "彈反");
+    hitStop = perfect ? 10 : 5;
+    screenShake = perfect ? 12 : 6;
+    addEffect(player.x, player.y, perfect ? 90 : 58, perfect ? "rgba(255,230,80,0.85)" : "rgba(90,190,255,0.65)", perfect ? 28 : 18, perfect ? "完美彈反" : "彈反");
+    addEffect(player.x, player.y, perfect ? 135 : 95, perfect ? "rgba(255,210,80,0.35)" : "rgba(80,180,255,0.28)", perfect ? 32 : 22);
+
+    const targets = [...enemies];
+    if (boss) targets.push(boss);
+    for (const e of targets) {
+        if (dist(player, e) < (perfect ? 150 : 105)) {
+            e.stagger = perfect ? 40 : 22;
+            e.hitFlash = perfect ? 12 : 7;
+        }
+    }
 
     player.parryTime = 0;
     player.parryRecovery = 0;
@@ -470,6 +621,7 @@ function dash() {
 
     const a = angleTo(player, mouse);
     player.dashCharges--;
+    player.dashHitSet.clear();
     player.dashTime = 10;
     player.dashInvuln = player.form === "Shadow Bat" ? 14 : 5;
     player.dashVx = Math.cos(a) * (player.form === "Shadow Bat" ? 15 : 11);
@@ -537,6 +689,15 @@ function parry() {
 
 function useSkill() {
     if (gamePaused || gameOver) return;
+    if (player.form === "Young Bat") {
+        addEffect(player.x, player.y, 65, "rgba(255,255,255,0.25)", 24, "尚未進化");
+        return;
+    }
+    if (player.skillCooldown > 0) {
+        addEffect(player.x, player.y, 55, "rgba(255,255,255,0.18)", 20, "冷卻中");
+        return;
+    }
+    let usedSkill = false;
 
     if (player.form === "Blood Bat") {
         const cost = player.maxHp * 0.15;
@@ -550,6 +711,7 @@ function useSkill() {
             for (const e of targets) {
                 if (dist(player, e) < 120 + e.r) damageEnemy(e, 45);
             }
+            usedSkill = true;
         }
     }
 
@@ -566,6 +728,7 @@ function useSkill() {
                 if (e.echoMark >= 4) explodeEchoMark(e);
             }
         }
+        usedSkill = true;
     }
 
     if (player.form === "Shadow Bat") {
@@ -574,6 +737,11 @@ function useSkill() {
         player.dashCharges = clamp(player.dashCharges + 1, 0, player.maxDashCharges);
         player.empoweredAttack = true;
         addEffect(player.x, player.y, 80, "rgba(120,80,255,0.55)", 35, "影獵");
+        usedSkill = true;
+    }
+
+    if (usedSkill) {
+        player.skillCooldown = player.maxSkillCooldown;
     }
 }
 
@@ -585,19 +753,29 @@ function formName(form = player.form) {
     return form;
 }
 
+function updateTrainerButtonLabels() {
+    const invBtn = document.getElementById("btnInvincible");
+    const moveBtn = document.getElementById("btnEnemyMove");
+    const spawnBtn = document.getElementById("btnAutoSpawn");
+
+    if (invBtn) invBtn.textContent = "F1 無敵：" + (invincible ? "ON" : "OFF");
+    if (moveBtn) moveBtn.textContent = "F2 敵人移動：" + (enemyMoveEnabled ? "ON" : "OFF");
+    if (spawnBtn) spawnBtn.textContent = "F3 自動生怪：" + (autoSpawnEnabled ? "ON" : "OFF");
+}
+
 function toggleInvincible(btn) {
     invincible = !invincible;
-    btn.textContent = "無敵：" + (invincible ? "ON" : "OFF");
+    updateTrainerButtonLabels();
 }
 
 function toggleEnemyMove(btn) {
     enemyMoveEnabled = !enemyMoveEnabled;
-    btn.textContent = "敵人移動：" + (enemyMoveEnabled ? "ON" : "OFF");
+    updateTrainerButtonLabels();
 }
 
 function toggleAutoSpawn(btn) {
     autoSpawnEnabled = !autoSpawnEnabled;
-    btn.textContent = "自動生怪：" + (autoSpawnEnabled ? "ON" : "OFF");
+    updateTrainerButtonLabels();
 }
 
 function setForm(form) {
@@ -620,6 +798,8 @@ function setForm(form) {
     player.bloodRage = 0;
     player.shadowHunt = 0;
     player.invisible = 0;
+    player.hitFlash = 0;
+    player.skillCooldown = 0;
 
     overlay.style.display = "none";
     gamePaused = false;
@@ -721,7 +901,9 @@ function explodeEchoMark(e) {
         }
     }
 
-    if (nearest && nearestD < 220) nearest.echoMark++;
+    if (nearest && nearestD < 220) {
+        applyEchoMark(nearest);
+    }
 }
 
 function applyShadowMark(e) {
@@ -745,6 +927,7 @@ function updatePlayer() {
     if (player.shadowHunt > 0) player.shadowHunt--;
     if (player.invisible > 0) player.invisible--;
     if (player.hitFlash > 0) player.hitFlash--;
+    if (player.skillCooldown > 0) player.skillCooldown--;
 
     if (player.dashTime > 0) {
         player.x += player.dashVx;
@@ -756,6 +939,11 @@ function updatePlayer() {
 
         for (const e of targets) {
             if (circleHit(player, e)) {
+
+                // 同一次衝刺中，已經命中的敵人不再重複觸發
+                if (player.dashHitSet.has(e)) continue;
+                player.dashHitSet.add(e);
+
                 if (player.form === "Shadow Bat") {
                     damageEnemy(e, 20);
                     applyShadowMark(e);
@@ -803,25 +991,43 @@ function updatePlayer() {
 function updateEnemies() {
     for (const e of enemies) {
         if (e.slow > 0) e.slow--;
+        if (e.hitFlash > 0) e.hitFlash--;
+        if (e.stagger > 0) e.stagger--;
 
-        const spd = e.speed * (e.slow > 0 ? 0.45 : 1);
-        const a = angleTo(e, player);
+        const spd = e.stagger > 0 ? 0 : e.speed * (e.slow > 0 ? 0.45 : 1);
+
+        // 影獵隱形修正：
+        // 沒隱形時，敵人會持續記錄玩家最後位置。
+        // 隱形時，敵人只會追最後看到的位置，不會即時鎖定玩家。
+        if (player.invisible <= 0) {
+            e.lastSeenX = player.x;
+            e.lastSeenY = player.y;
+        }
+
+        const target = {
+            x: e.lastSeenX ?? player.x,
+            y: e.lastSeenY ?? player.y
+        };
+
+        const a = angleTo(e, target);
 
         if (e.type === "melee") {
-            if (enemyMoveEnabled) {
+            const targetDistance = dist(e, target);
+
+            if (enemyMoveEnabled && targetDistance > 8) {
                 e.x += Math.cos(a) * spd;
                 e.y += Math.sin(a) * spd;
             }
 
             e.attackCd--;
-            if (circleHit(e, player) && e.attackCd <= 0) {
+            if (player.invisible <= 0 && circleHit(e, player) && e.attackCd <= 0) {
                 hurtPlayer(10);
                 e.attackCd = 60;
             }
         }
 
         if (e.type === "ranged") {
-            const d = dist(e, player);
+            const d = dist(e, target);
             if (enemyMoveEnabled) {
                 if (d > 260) {
                     e.x += Math.cos(a) * spd;
@@ -840,7 +1046,9 @@ function updateEnemies() {
         }
 
         if (e.type === "heavy") {
-            if (enemyMoveEnabled) {
+            const targetDistance = dist(e, target);
+
+            if (enemyMoveEnabled && targetDistance > 8) {
                 e.x += Math.cos(a) * spd;
                 e.y += Math.sin(a) * spd;
             }
@@ -851,7 +1059,7 @@ function updateEnemies() {
                 e.attackCd = 150;
             }
 
-            if (circleHit(e, player)) hurtPlayer(14);
+            if (player.invisible <= 0 && circleHit(e, player)) hurtPlayer(14);
         }
     }
 }
@@ -928,6 +1136,9 @@ function updateBoss() {
     if (!boss) return;
 
     if (boss.slow > 0) boss.slow--;
+    if (boss.hitFlash > 0) boss.hitFlash--;
+    if (boss.stagger > 0) boss.stagger--;
+    if (boss.stagger > 0) return;
 
     if (boss.hp < boss.maxHp * 0.5 && boss.phase === 1) {
         boss.phase = 2;
@@ -1047,21 +1258,38 @@ function updateSpawning() {
 function drawUI() {
     ctx.save();
     ctx.font = "16px Arial";
-    ctx.fillStyle = "white";
+    ctx.fillStyle = "white";    
+
+    // 右上角版本資訊
+    ctx.save();
+    ctx.font = "14px Arial";
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fillText("ECHO OF THE BAT", canvas.width - 20, 26);
+    ctx.fillText(GAME_VERSION, canvas.width - 20, 46);
+    ctx.fillText("更新：" + BUILD_DATE, canvas.width - 20, 66);
+    ctx.restore();
 
     ctx.fillText("蝙蝠回聲 ECHO OF THE BAT｜訓練場版", 20, 26);
     ctx.fillText("移動：WASD｜普攻：左鍵｜彈反：右鍵｜衝刺：Space｜聲波：E｜固有技能：Q",20,52);
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.fillStyle = "white";
 
     drawBar(20, 70, 240, 18, player.hp / player.maxHp, "#c92a4b", "生命");
     drawBar(20, 96, 240, 14, player.xp / player.xpToEvolve, "#f5c542", "經驗");
 
     ctx.fillStyle = "white";
     ctx.fillText(`型態：${formName()}`, 20, 135);
-    ctx.fillText(`聲波：${Math.floor(player.echoCharges)} / ${player.maxEchoCharges}`, 20, 160);
-    ctx.fillText(`衝刺：${Math.floor(player.dashCharges)} / ${player.maxDashCharges}`, 20, 185);
+    ctx.fillText(`聲波：${Math.floor(player.echoCharges)} / ${player.maxEchoCharges}　衝刺：${Math.floor(player.dashCharges)} / ${player.maxDashCharges}`, 20, 160);
 
+    if (player.form === "Blood Bat") {
+        ctx.fillStyle = "#ff5b83";
+        ctx.fillText(`血怒增傷：+${getBloodBonusPercent()}%`, 20, 185);
+    }
     if (player.bloodRage > 0) ctx.fillText("血怒狀態中", 20, 210);
     if (player.shadowHunt > 0) ctx.fillText("影獵狀態中", 20, 210);
+
+    drawSkillIcon(26, 226);
 
     if (boss) {
         drawBar(canvas.width / 2 - 220, 25, 440, 18, boss.hp / boss.maxHp, "#9b2cff", `Boss 第 ${boss.phase} 階段`);
@@ -1070,17 +1298,36 @@ function drawUI() {
     ctx.restore();
 }
 
-function drawLowHpWarning() {
-    const hpRate = player.hp / player.maxHp;
-
-    if (hpRate > 0.3) return;
-
-    const alpha = 0.12 + Math.sin(Date.now() / 120) * 0.06;
+function drawSkillIcon(x, y) {
+    const size = 54;
+    const ready = player.form !== "Young Bat" && player.skillCooldown <= 0;
+    const ratio = player.maxSkillCooldown ? 1 - player.skillCooldown / player.maxSkillCooldown : 1;
 
     ctx.save();
-    ctx.strokeStyle = "rgba(255, 0, 0, " + alpha + ")";
-    ctx.lineWidth = 35;
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = ready ? formAccentColor(0.75) : "rgba(80,80,90,0.72)";
+    ctx.strokeStyle = ready ? formAccentColor(1) : "rgba(180,180,190,0.5)";
+    ctx.lineWidth = 2;
+    ctx.fillRect(x, y, size, size);
+    ctx.strokeRect(x, y, size, size);
+
+    if (!ready) {
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(x, y, size, size * (1 - ratio));
+    }
+
+    ctx.fillStyle = "white";
+    ctx.font = "12px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Q", x + size / 2, y + 16);
+    ctx.font = "13px Arial";
+    ctx.fillText(skillName(), x + size / 2, y + 36);
+
+    if (player.skillCooldown > 0) {
+        ctx.font = "bold 18px Arial";
+        ctx.fillText(Math.ceil(player.skillCooldown / 60), x + size / 2, y + size / 2 + 7);
+    }
+
+    ctx.textAlign = "left";
     ctx.restore();
 }
 
@@ -1141,32 +1388,46 @@ function drawPlayer() {
     }
 
     if (player.parryTime > 0) {
+        const pRatio = player.parryTime / 18;
+        ctx.save();
         ctx.strokeStyle = player.perfectParryTime > 0 ? "#fff27a" : "#9edcff";
-        ctx.lineWidth = 3;
+        ctx.fillStyle = player.perfectParryTime > 0 ? "rgba(255,240,120,0.12)" : "rgba(90,190,255,0.10)";
+        ctx.lineWidth = player.perfectParryTime > 0 ? 5 : 3;
         ctx.beginPath();
-        ctx.arc(player.x, player.y, 34, 0, Math.PI * 2);
+        ctx.arc(player.x, player.y, 34 + (1 - pRatio) * 14, 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
+        ctx.restore();
     }
 
-    // 角色旁邊顯示資源
-    ctx.save();
-    ctx.font = "14px Arial";
-    ctx.textAlign = "center";
-
-    // 聲波次數
-    ctx.fillStyle = "#4fe3ff";
-    ctx.fillText("聲波 " + Math.floor(player.echoCharges) + "/" + player.maxEchoCharges, player.x, player.y - 36);
-
-    // 衝刺次數
-    ctx.fillStyle = "#a48cff";
-    ctx.fillText("衝刺 " + Math.floor(player.dashCharges) + "/" + player.maxDashCharges, player.x, player.y + 46);
-
-    ctx.restore();
+    drawPlayerResourceIcons();
 }
+
+function drawPlayerResourceIcons() {
+    const baseX = player.x;
+    const baseY = player.y;
+
+    // 聲波：圓形，顯示當前格數與下一格回復進度
+    for (let i = 0; i < player.maxEchoCharges; i++) {
+        const filled = i < Math.floor(player.echoCharges);
+        const recharging = !filled && i === Math.floor(player.echoCharges);
+        const ratio = filled ? 1 : recharging ? player.echoRecharge : 0;
+        drawCooldownCircle(baseX - 38 + i * 22, baseY - 48, 9, ratio, "rgba(75,225,255,0.9)", "", filled ? "●" : "", "circle");
+    }
+
+    // 衝刺：菱形，顯示當前格數與下一格回復進度
+    for (let i = 0; i < player.maxDashCharges; i++) {
+        const filled = i < Math.floor(player.dashCharges);
+        const recharging = !filled && i === Math.floor(player.dashCharges);
+        const ratio = filled ? 1 : recharging ? player.dashRecharge : 0;
+        drawCooldownCircle(baseX - 22 + i * 25, baseY + 48, 10, ratio, "rgba(165,135,255,0.9)", "", filled ? "◆" : "", "diamond");
+    }
+}
+
 
 function drawEnemies() {
     for (const e of enemies) {
-        ctx.fillStyle =
+        ctx.fillStyle = e.hitFlash > 0 ? "#ffffff" :
             e.type === "melee" ? "#ff6b6b" :
             e.type === "ranged" ? "#ffb347" :
             "#b45cff";
@@ -1184,7 +1445,7 @@ function drawEnemies() {
     }
 
     if (boss) {
-        ctx.fillStyle = boss.phase === 1 ? "#7b2cff" : "#ff2f68";
+        ctx.fillStyle = boss.hitFlash > 0 ? "#ffffff" : boss.phase === 1 ? "#7b2cff" : "#ff2f68";
         ctx.beginPath();
         ctx.arc(boss.x, boss.y, boss.r, 0, Math.PI * 2);
         ctx.fill();
