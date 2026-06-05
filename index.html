@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>蝙蝠回聲 ECHO OF THE BAT｜訓練場版</title>
+<title>蝙蝠回聲 ECHO OF THE BAT｜v0.4.0</title>
 <style>
     * {
         box-sizing: border-box;
@@ -94,14 +94,101 @@
         text-align: center;
     }
 
-    #trainer .help {
-        font-size: 12px;
-        line-height: 1.45;
-        color: #cfcfe8;
-        background: rgba(0,0,0,0.28);
-        border: 1px solid #444;
-        border-radius: 6px;
-        padding: 8px 10px;
+
+    #startScreen {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at center, rgba(30,30,55,0.96) 0%, rgba(5,5,10,0.98) 70%);
+        padding: 24px;
+    }
+
+    #startPanel {
+        width: 980px;
+        max-width: 94vw;
+        max-height: 92vh;
+        overflow-y: auto;
+        padding: 28px;
+        border: 2px solid rgba(160,160,220,0.45);
+        background: rgba(12,12,24,0.92);
+        border-radius: 18px;
+        box-shadow: 0 0 40px rgba(90,90,180,0.18);
+    }
+
+    #startPanel h1 {
+        margin: 0 0 4px;
+        font-size: 44px;
+        letter-spacing: 2px;
+    }
+
+    #startPanel h2 {
+        margin: 0 0 20px;
+        font-size: 20px;
+        color: #b8d7ff;
+        font-weight: normal;
+    }
+
+    #startPanel p {
+        line-height: 1.7;
+        color: #ddd;
+    }
+
+    .start-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin: 18px 0;
+    }
+
+    .start-card {
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 12px;
+        padding: 14px;
+        background: rgba(255,255,255,0.05);
+        min-height: 150px;
+    }
+
+    .start-card h3 {
+        margin: 0 0 8px;
+        font-size: 19px;
+    }
+
+    .blood-card h3 { color: #ff5b83; }
+    .echo-card h3 { color: #4fe3ff; }
+    .shadow-card h3 { color: #a48cff; }
+
+    .controls-box {
+        margin-top: 14px;
+        padding: 14px;
+        border: 1px solid rgba(255,255,255,0.16);
+        border-radius: 12px;
+        background: rgba(0,0,0,0.25);
+        color: #ddd;
+        line-height: 1.8;
+    }
+
+    .start-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+    }
+
+    .primary-btn {
+        background: #4b4bd8;
+        font-weight: bold;
+    }
+
+    .primary-btn:hover {
+        background: #6868ff;
+    }
+
+    @media (max-width: 760px) {
+        .start-grid { grid-template-columns: 1fr; }
+        #startPanel h1 { font-size: 32px; }
     }
 
 </style>
@@ -109,13 +196,49 @@
 <body>
 <canvas id="game"></canvas>
 
+<div id="startScreen">
+    <div id="startPanel">
+        <h1>ECHO OF THE BAT</h1>
+        <h2>蝙蝠回聲｜v0.4.0 房間與波次系統版</h2>
+        <p>在無盡的黑夜中，一隻年幼的蝙蝠從巢穴中甦醒。牠沒有名字，也沒有記憶，只有體內流動的本能，引導牠穿越這片被怪物吞噬的世界。</p>
+        <p><strong>獵殺、成長、進化。</strong> 透過戰鬥累積經驗，選擇你的進化道路，成為掌控鮮血的血蝠、操縱回聲的回聲蝠，或穿梭陰影的影蝠。</p>
+
+        <div class="start-grid">
+            <div class="start-card blood-card">
+                <h3>血蝠｜殘血狂戰士</h3>
+                <p>生命越低，攻擊越兇。普攻疊加血印，五層後引爆並大量回血。適合喜歡貼臉、吸血、極限反殺的玩家。</p>
+            </div>
+            <div class="start-card echo-card">
+                <h3>回聲蝠｜連鎖控場者</h3>
+                <p>以聲波標記敵人，累積印記後引爆並傳播。適合喜歡控場、鋪場、讓整群敵人一起爆炸的玩家。</p>
+            </div>
+            <div class="start-card shadow-card">
+                <h3>影蝠｜高速掠食者</h3>
+                <p>利用衝刺、背刺與夜影印記不斷刷新位移。適合喜歡高操作、高機動、在敵群中穿梭的玩家。</p>
+            </div>
+        </div>
+
+        <div class="controls-box">
+            <strong>基本操作</strong><br>
+            WASD：移動｜左鍵：普攻｜右鍵：彈反｜E：聲波｜Space：衝刺｜Q：固有技能<br>
+            <strong>訓練場快捷鍵</strong><br>
+            1 幼蝠｜2 血蝠｜3 回聲蝠｜4 影蝠｜F1 無敵｜F2 敵人移動｜F3 自動生怪｜F8 清場｜F9 直接進化
+        </div>
+
+        <div class="start-actions">
+            <button class="primary-btn" onclick="startRunMode()">開始冒險</button>
+            <button onclick="startTrainingMode()">進入訓練場</button>
+            <button onclick="startAsForm('Blood Bat')">訓練：血蝠</button>
+            <button onclick="startAsForm('Echo Bat')">訓練：回聲蝠</button>
+            <button onclick="startAsForm('Shadow Bat')">訓練：影蝠</button>
+        </div>
+    </div>
+</div>
+
+
 <div id="trainer">
     <div class="title">訓練場</div>
-    <div class="help">
-        快捷鍵：1幼 / 2血 / 3聲 / 4影<br>
-        F1無敵｜F2敵動｜F3自動生怪<br>
-        F4近戰｜F5遠程｜F6重甲｜F7 Boss｜F8清場｜F9進化
-    </div>
+    <button onclick="showPauseMenu()">ESC 暫停 / 主選單</button>
     <button id="btnInvincible" onclick="toggleInvincible(this)">F1 無敵：OFF</button>
     <button id="btnEnemyMove" onclick="toggleEnemyMove(this)">F2 敵人移動：ON</button>
     <button id="btnAutoSpawn" onclick="toggleAutoSpawn(this)">F3 自動生怪：OFF</button>
@@ -142,7 +265,7 @@
 
 <script>
 const canvas = document.getElementById("game");
-const GAME_VERSION = "v0.2.3 訓練場快捷鍵版";
+const GAME_VERSION = "v0.4.0 房間與波次系統版";
 const BUILD_DATE = "2026-06-05";
 const ctx = canvas.getContext("2d");
 
@@ -159,9 +282,20 @@ const mouse = { x: canvas.width / 2, y: canvas.height / 2, down: false };
 window.addEventListener("keydown", e => {
     keys[e.key.toLowerCase()] = true;
 
+    if (e.key === "Escape") {
+        e.preventDefault();
+        if (startScreen.style.display === "none" && overlay.style.display !== "flex" && !gameOver) {
+            showPauseMenu();
+        }
+        return;
+    }
+
     if (e.key === " ") dash();
     if (e.key.toLowerCase() === "e") echoWave();
     if (e.key.toLowerCase() === "q") useSkill();
+
+    // 主選單或彈窗開啟時，不觸發訓練場快捷鍵，避免誤切型態。
+    if (startScreen.style.display !== "none" || overlay.style.display === "flex") return;
 
     // 訓練場快捷鍵
     if (e.key === "1") setForm("Young Bat");
@@ -198,12 +332,13 @@ canvas.addEventListener("contextmenu", e => {
         parry();
 });
 
+const startScreen = document.getElementById("startScreen");
 const overlay = document.getElementById("overlay");
 const overlayTitle = document.getElementById("overlayTitle");
 const overlayText = document.getElementById("overlayText");
 const buttons = document.getElementById("buttons");
 
-let gamePaused = false;
+let gamePaused = true;
 let gameOver = false;
 let screenShake = 0;
 let hitStop = 0;
@@ -280,14 +415,97 @@ const fallingAttacks = [];
 
 let boss = null;
 let spawnTimer = 0;
+let killCount = 0;
+let runStartTime = 0;
 
-function spawnEnemy(type, atMouse = false) {
+// v0.4.0：房間與波次系統
+let gameMode = "menu"; // menu / training / run
+let currentRoomIndex = 0;
+let currentWaveIndex = 0;
+let waveActive = false;
+let roomMessageTimer = 0;
+let roomMessageText = "";
+
+const rooms = [
+    {
+        name: "覺醒巢穴",
+        intro: "第一個房間：熟悉移動、普攻、衝刺與彈反。",
+        waves: [
+            ["melee", "melee", "melee"],
+            ["melee", "melee", "ranged"],
+            ["melee", "melee", "melee", "ranged"]
+        ]
+    },
+    {
+        name: "回聲走廊",
+        intro: "第二個房間：遠程敵人開始增加，善用聲波與走位。",
+        waves: [
+            ["ranged", "ranged", "melee"],
+            ["melee", "ranged", "ranged", "heavy"],
+            ["melee", "melee", "ranged", "ranged", "heavy"]
+        ]
+    },
+    {
+        name: "血月前廳",
+        intro: "第三個房間：重甲怪加入戰場，測試你的進化路線是否成形。",
+        waves: [
+            ["heavy", "melee", "melee"],
+            ["heavy", "ranged", "ranged"],
+            ["heavy", "heavy", "melee", "ranged"]
+        ]
+    },
+    {
+        name: "第一獵場",
+        intro: "Boss 房：擊倒第一個大型獵物。",
+        bossRoom: true,
+        waves: []
+    }
+];
+
+function getArenaRect() {
+    const marginX = Math.max(80, canvas.width * 0.08);
+    const marginY = Math.max(85, canvas.height * 0.12);
+    return {
+        x: marginX,
+        y: marginY,
+        w: canvas.width - marginX * 2 - 190,
+        h: canvas.height - marginY * 2
+    };
+}
+
+function getSpawnPoints() {
+    const a = getArenaRect();
+    return [
+        { x: a.x + 70, y: a.y + 70 },
+        { x: a.x + a.w - 70, y: a.y + 70 },
+        { x: a.x + 70, y: a.y + a.h - 70 },
+        { x: a.x + a.w - 70, y: a.y + a.h - 70 },
+        { x: a.x + a.w / 2, y: a.y + 60 },
+        { x: a.x + a.w / 2, y: a.y + a.h - 60 }
+    ];
+}
+
+function showRoomMessage(text, frames = 150) {
+    roomMessageText = text;
+    roomMessageTimer = frames;
+    addEffect(canvas.width / 2, canvas.height / 2, 130, "rgba(180,200,255,0.25)", 55, text);
+}
+
+function spawnEnemy(type, atMouse = false, forcedX = null, forcedY = null) {
     const edge = Math.floor(Math.random() * 4);
     let x, y;
 
-    if (atMouse) {
+    if (forcedX !== null && forcedY !== null) {
+        x = forcedX;
+        y = forcedY;
+    } else if (atMouse) {
         x = mouse.x;
         y = mouse.y;
+    } else if (gameMode === "run") {
+        const points = getSpawnPoints();
+        const p = points[Math.floor(Math.random() * points.length)];
+        x = p.x + rand(-24, 24);
+        y = p.y + rand(-24, 24);
     } else {
         if (edge === 0) { x = rand(0, canvas.width); y = -40; }
         if (edge === 1) { x = canvas.width + 40; y = rand(0, canvas.height); }
@@ -489,11 +707,14 @@ function damageEnemy(e, amount) {
     if (e.hp <= 0) {
         if (e === boss) {
             boss = null;
+            killCount++;
             player.xp += 150;
             addEffect(canvas.width / 2, canvas.height / 2, 160, "rgba(255,220,120,0.35)", 80, "BOSS 擊敗");
+            bossVictory();
         } else {
             const i = enemies.indexOf(e);
             if (i >= 0) enemies.splice(i, 1);
+            killCount++;
             player.xp += e.type === "heavy" ? 35 : 15;
         }
 
@@ -745,6 +966,287 @@ function useSkill() {
     }
 }
 
+function setTrainerVisible(visible) {
+    const trainer = document.getElementById("trainer");
+    if (trainer) trainer.style.display = visible ? "flex" : "none";
+}
+
+function startRunMode() {
+    resetGameState();
+    gameMode = "run";
+    currentRoomIndex = 0;
+    currentWaveIndex = 0;
+    waveActive = false;
+    startScreen.style.display = "none";
+    overlay.style.display = "none";
+    setTrainerVisible(false);
+    gamePaused = false;
+    movePlayerToRoomCenter();
+    showRoomMessage(rooms[currentRoomIndex].name, 120);
+    setTimeout(() => {
+        if (gameMode === "run" && !gamePaused && !gameOver) startCurrentRoom();
+    }, 700);
+}
+
+function startTrainingMode() {
+    resetGameState();
+    gameMode = "training";
+    startScreen.style.display = "none";
+    overlay.style.display = "none";
+    setTrainerVisible(true);
+    gamePaused = false;
+    addEffect(player.x, player.y, 120, "rgba(220,220,255,0.32)", 50, "開始訓練");
+}
+
+function movePlayerToRoomCenter() {
+    const a = getArenaRect();
+    player.x = a.x + a.w / 2;
+    player.y = a.y + a.h / 2;
+}
+
+function startCurrentRoom() {
+    const room = rooms[currentRoomIndex];
+    clearEnemies();
+    movePlayerToRoomCenter();
+    showRoomMessage(room.intro || room.name, 150);
+
+    if (room.bossRoom) {
+        const a = getArenaRect();
+        spawnBoss(false);
+        if (boss) {
+            boss.x = a.x + a.w / 2;
+            boss.y = a.y + 110;
+        }
+        waveActive = true;
+        return;
+    }
+
+    currentWaveIndex = 0;
+    startNextWave();
+}
+
+function startNextWave() {
+    const room = rooms[currentRoomIndex];
+    if (!room || room.bossRoom) return;
+
+    if (currentWaveIndex >= room.waves.length) {
+        completeRoom();
+        return;
+    }
+
+    const wave = room.waves[currentWaveIndex];
+    const points = getSpawnPoints();
+
+    for (let i = 0; i < wave.length; i++) {
+        const p = points[i % points.length];
+        spawnEnemy(wave[i], false, p.x + rand(-28, 28), p.y + rand(-28, 28));
+    }
+
+    waveActive = true;
+    showRoomMessage(`${room.name}｜第 ${currentWaveIndex + 1} 波`, 100);
+}
+
+function completeRoom() {
+    waveActive = false;
+    currentRoomIndex++;
+
+    if (currentRoomIndex >= rooms.length) {
+        bossVictory();
+        return;
+    }
+
+    showRoomMessage("房間清理完成", 90);
+    setTimeout(() => {
+        if (gameMode === "run" && !gamePaused && !gameOver) startCurrentRoom();
+    }, 900);
+}
+
+function updateRoomSystem() {
+    if (gameMode !== "run" || gamePaused || gameOver) return;
+
+    if (roomMessageTimer > 0) roomMessageTimer--;
+
+    const room = rooms[currentRoomIndex];
+    if (!room) return;
+
+    if (!room.bossRoom && waveActive && enemies.length === 0) {
+        waveActive = false;
+        currentWaveIndex++;
+        setTimeout(() => {
+            if (gameMode === "run" && !gamePaused && !gameOver) startNextWave();
+        }, 650);
+    }
+}
+
+function drawArena() {
+    if (gameMode !== "run") return;
+
+    const a = getArenaRect();
+    ctx.save();
+
+    ctx.fillStyle = "rgba(0,0,0,0.16)";
+    ctx.fillRect(a.x, a.y, a.w, a.h);
+
+    ctx.strokeStyle = "rgba(180,200,255,0.38)";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(a.x, a.y, a.w, a.h);
+
+    ctx.strokeStyle = "rgba(100,130,255,0.15)";
+    ctx.lineWidth = 1;
+    for (let x = a.x + 80; x < a.x + a.w; x += 80) {
+        ctx.beginPath();
+        ctx.moveTo(x, a.y);
+        ctx.lineTo(x, a.y + a.h);
+        ctx.stroke();
+    }
+    for (let y = a.y + 80; y < a.y + a.h; y += 80) {
+        ctx.beginPath();
+        ctx.moveTo(a.x, y);
+        ctx.lineTo(a.x + a.w, y);
+        ctx.stroke();
+    }
+
+    const points = getSpawnPoints();
+    for (const p of points) {
+        ctx.strokeStyle = "rgba(255,120,120,0.35)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+function clampToArena() {
+    if (gameMode !== "run") return;
+    const a = getArenaRect();
+    player.x = clamp(player.x, a.x + player.r, a.x + a.w - player.r);
+    player.y = clamp(player.y, a.y + player.r, a.y + a.h - player.r);
+}
+
+function resetGameState() {
+    enemies.length = 0;
+    projectiles.length = 0;
+    effects.length = 0;
+    fallingAttacks.length = 0;
+    boss = null;
+    spawnTimer = 0;
+    screenShake = 0;
+    hitStop = 0;
+    gameOver = false;
+    killCount = 0;
+    runStartTime = Date.now();
+
+    player.x = canvas.width / 2;
+    player.y = canvas.height / 2;
+    player.r = 16;
+    player.maxHp = 100;
+    player.hp = 100;
+    player.speed = 4;
+    player.form = "Young Bat";
+    player.xp = 0;
+    player.xpToEvolve = 80;
+    player.evolved = false;
+
+    player.maxEchoCharges = 2;
+    player.echoCharges = 2;
+    player.echoRecharge = 0;
+
+    player.maxDashCharges = 1;
+    player.dashCharges = 1;
+    player.dashRecharge = 0;
+    player.dashTime = 0;
+    player.dashVx = 0;
+    player.dashVy = 0;
+    player.dashInvuln = 0;
+    player.dashHitSet.clear();
+
+    player.parryTime = 0;
+    player.perfectParryTime = 0;
+    player.parryRecovery = 0;
+    player.attackTime = 0;
+    player.attackAngle = 0;
+    player.empoweredAttack = false;
+    player.bloodRage = 0;
+    player.shadowHunt = 0;
+    player.invisible = 0;
+    player.hitFlash = 0;
+    player.skillCooldown = 0;
+
+    invincible = false;
+    enemyMoveEnabled = true;
+    autoSpawnEnabled = false;
+    currentRoomIndex = 0;
+    currentWaveIndex = 0;
+    waveActive = false;
+    roomMessageTimer = 0;
+    roomMessageText = "";
+    updateTrainerButtonLabels();
+}
+
+function startGame() {
+    startTrainingMode();
+}
+
+function startAsForm(form) {
+    startTrainingMode();
+    setForm(form);
+}
+
+function returnToMainMenu() {
+    resetGameState();
+    gameMode = "menu";
+    overlay.style.display = "none";
+    startScreen.style.display = "flex";
+    setTrainerVisible(true);
+    gamePaused = true;
+}
+
+function resumeGame() {
+    overlay.style.display = "none";
+    gamePaused = false;
+}
+
+function restartCurrentMode() {
+    if (gameMode === "run") startRunMode();
+    else startTrainingMode();
+}
+
+function showPauseMenu() {
+    if (gameOver) return;
+    gamePaused = true;
+    overlay.style.display = "flex";
+    overlayTitle.textContent = "暫停";
+    overlayText.innerHTML = "黑夜暫時安靜下來。<br>你可以繼續挑戰、重新開始，或回到主選單。";
+    buttons.innerHTML = "";
+    addButton("繼續遊戲", "回到戰場。", resumeGame);
+    addButton("重新開始", "重置本局，重新開始目前模式。", restartCurrentMode);
+    addButton("返回主選單", "回到開始畫面與世界觀介紹。", returnToMainMenu);
+    addButton("操作說明", "查看基本操作與訓練場快捷鍵。", showControlsOverlay);
+}
+
+function showControlsOverlay() {
+    gamePaused = true;
+    overlay.style.display = "flex";
+    overlayTitle.textContent = "操作說明";
+    overlayText.innerHTML = `
+        <strong>基本操作</strong><br>
+        WASD：移動｜左鍵：普攻｜右鍵：彈反｜E：聲波｜Space：衝刺｜Q：固有技能<br><br>
+        <strong>訓練場快捷鍵</strong><br>
+        1 幼蝠｜2 血蝠｜3 回聲蝠｜4 影蝠<br>
+        F1 無敵｜F2 敵人移動｜F3 自動生怪｜F4 近戰｜F5 遠程｜F6 重甲｜F7 Boss｜F8 清場｜F9 直接進化
+    `;
+    buttons.innerHTML = "";
+    addButton("返回暫停選單", "回到暫停選單。", showPauseMenu);
+    addButton("繼續遊戲", "關閉說明並回到戰場。", resumeGame);
+}
+
+function getSurvivalSeconds() {
+    if (!runStartTime) return 0;
+    return Math.floor((Date.now() - runStartTime) / 1000);
+}
+
 function formName(form = player.form) {
     if (form === "Young Bat") return "幼蝠";
     if (form === "Blood Bat") return "血蝠";
@@ -825,13 +1327,13 @@ function checkEvolution() {
     if (!player.evolved && player.xp >= player.xpToEvolve) {
         gamePaused = true;
         overlay.style.display = "flex";
-        overlayTitle.textContent = "選擇進化";
-        overlayText.textContent = "幼蝠即將進化，選擇一條戰鬥路線。";
+        overlayTitle.textContent = "力量正在覺醒";
+        overlayText.textContent = "幼蝠已經累積足夠經驗。選擇一條進化道路，改變你的戰鬥方式。";
         buttons.innerHTML = "";
 
-        addButton("血蝠", "血量越低傷害越高。血印、吸血、血爆。", () => evolve("Blood Bat"));
-        addButton("回聲蝠", "聲波更遠更廣，可疊回聲印記與共振爆發。", () => evolve("Echo Bat"));
-        addButton("影蝠", "兩段衝刺、強化普攻、背刺與影獵。", () => evolve("Shadow Bat"));
+        addButton("血蝠｜殘血狂戰士", "生命越低傷害越高。普攻疊加血印，五層引爆並大量回血；血爆會消耗生命，換取範圍傷害與爆發能力。", () => evolve("Blood Bat"));
+        addButton("回聲蝠｜連鎖控場者", "聲波更遠、更廣、可穿透。聲波命中疊加回聲印記，四層引爆並傳播，適合清理成群敵人。", () => evolve("Echo Bat"));
+        addButton("影蝠｜高速掠食者", "獲得兩段衝刺。衝刺後普攻變為背刺，夜影印記三層引爆可回復衝刺，適合高操作連段。", () => evolve("Shadow Bat"));
     }
 }
 
@@ -974,6 +1476,7 @@ function updatePlayer() {
 
     player.x = clamp(player.x, 20, canvas.width - 20);
     player.y = clamp(player.y, 20, canvas.height - 20);
+    clampToArena();
 
     player.echoRecharge += 0.006;
     if (player.echoRecharge >= 1) {
@@ -1241,6 +1744,7 @@ function updateEffects() {
 }
 
 function updateSpawning() {
+    if (gameMode === "run") return;
     if (!autoSpawnEnabled) return;
 
     spawnTimer--;
@@ -1270,29 +1774,44 @@ function drawUI() {
     ctx.fillText("更新：" + BUILD_DATE, canvas.width - 20, 66);
     ctx.restore();
 
-    ctx.fillText("蝙蝠回聲 ECHO OF THE BAT｜訓練場版", 20, 26);
-    ctx.fillText("移動：WASD｜普攻：左鍵｜彈反：右鍵｜衝刺：Space｜聲波：E｜固有技能：Q",20,52);
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillStyle = "white";
-
-    drawBar(20, 70, 240, 18, player.hp / player.maxHp, "#c92a4b", "生命");
-    drawBar(20, 96, 240, 14, player.xp / player.xpToEvolve, "#f5c542", "經驗");
+    drawBar(20, 22, 240, 18, player.hp / player.maxHp, "#c92a4b", "生命");
+    drawBar(20, 48, 240, 14, player.xp / player.xpToEvolve, "#f5c542", "經驗");
 
     ctx.fillStyle = "white";
-    ctx.fillText(`型態：${formName()}`, 20, 135);
-    ctx.fillText(`聲波：${Math.floor(player.echoCharges)} / ${player.maxEchoCharges}　衝刺：${Math.floor(player.dashCharges)} / ${player.maxDashCharges}`, 20, 160);
+    ctx.fillText(`型態：${formName()}`, 20, 88);
+    ctx.fillText(`聲波：${Math.floor(player.echoCharges)} / ${player.maxEchoCharges}　衝刺：${Math.floor(player.dashCharges)} / ${player.maxDashCharges}`, 20, 113);
+    ctx.fillText(`擊殺：${killCount}　時間：${getSurvivalSeconds()}秒`, 20, 138);
+
+    if (gameMode === "run") {
+        const room = rooms[currentRoomIndex];
+        if (room) {
+            ctx.fillStyle = "#b8d7ff";
+            const waveText = room.bossRoom ? "Boss 房" : `第 ${Math.min(currentWaveIndex + 1, room.waves.length)} / ${room.waves.length} 波`;
+            ctx.fillText(`房間：${room.name}｜${waveText}`, 20, 163);
+            ctx.fillStyle = "white";
+        }
+    }
 
     if (player.form === "Blood Bat") {
         ctx.fillStyle = "#ff5b83";
-        ctx.fillText(`血怒增傷：+${getBloodBonusPercent()}%`, 20, 185);
+        ctx.fillText(`血怒增傷：+${getBloodBonusPercent()}%`, 20, gameMode === "run" ? 188 : 163);
     }
-    if (player.bloodRage > 0) ctx.fillText("血怒狀態中", 20, 210);
-    if (player.shadowHunt > 0) ctx.fillText("影獵狀態中", 20, 210);
+    if (player.bloodRage > 0) ctx.fillText("血怒狀態中", 20, gameMode === "run" ? 213 : 188);
+    if (player.shadowHunt > 0) ctx.fillText("影獵狀態中", 20, gameMode === "run" ? 213 : 188);
 
-    drawSkillIcon(26, 226);
+    drawSkillIcon(26, gameMode === "run" ? 229 : 204);
 
     if (boss) {
         drawBar(canvas.width / 2 - 220, 25, 440, 18, boss.hp / boss.maxHp, "#9b2cff", `Boss 第 ${boss.phase} 階段`);
+    }
+
+    if (roomMessageTimer > 0 && roomMessageText) {
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.font = "bold 28px Arial";
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.fillText(roomMessageText, canvas.width / 2, 92);
+        ctx.restore();
     }
 
     ctx.restore();
@@ -1538,6 +2057,7 @@ function update() {
     updateFallingAttacks();
     updateEffects();
     updateSpawning();
+    updateRoomSystem();
 }
 
 function draw() {
@@ -1550,6 +2070,7 @@ function draw() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    drawArena();
     drawFallingAttacks();
     drawProjectiles();
     drawEnemies();
@@ -1562,13 +2083,26 @@ function draw() {
     drawUI();
 }
 
+function bossVictory() {
+    gamePaused = true;
+    overlay.style.display = "flex";
+    overlayTitle.textContent = gameMode === "run" ? "第一輪狩獵完成" : "第一個獵物已倒下";
+    overlayText.innerHTML = `你的回聲撕開了黑夜。<br>目前型態：${formName()}｜擊殺數：${killCount}｜存活時間：${getSurvivalSeconds()} 秒`;
+    buttons.innerHTML = "";
+    if (gameMode !== "run") addButton("繼續挑戰", "保留目前狀態，繼續測試戰鬥。", resumeGame);
+    addButton("重新開始", "重置本局，重新開始目前模式。", restartCurrentMode);
+    addButton("返回主選單", "回到開始畫面。", returnToMainMenu);
+}
+
 function endGame() {
     gameOver = true;
+    gamePaused = true;
     overlay.style.display = "flex";
-    overlayTitle.textContent = "遊戲結束";
-    overlayText.textContent = `你達到的型態：${formName()}，經驗：${player.xp}`;
+    overlayTitle.textContent = "黑夜吞噬了你的回聲";
+    overlayText.innerHTML = `最終型態：${formName()}<br>經驗：${player.xp}｜擊殺數：${killCount}｜存活時間：${getSurvivalSeconds()} 秒`;
     buttons.innerHTML = "";
-    addButton("重新開始", "再玩一次", () => location.reload());
+    addButton("重新開始", "重置本局，重新開始目前模式。", restartCurrentMode);
+    addButton("返回主選單", "回到開始畫面，再次選擇進化道路。", returnToMainMenu);
 }
 
 function loop() {
@@ -1578,6 +2112,7 @@ function loop() {
 }
 
 // 訓練場預設空場，請用右上角按鈕手動放置敵人。
+updateTrainerButtonLabels();
 loop();
 </script>
 </body>
